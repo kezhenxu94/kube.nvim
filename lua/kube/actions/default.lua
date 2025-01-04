@@ -16,12 +16,15 @@ local M = {
 
 		vim.api.nvim_set_current_buf(buf)
 
-		local yaml = require("kubectl").get_resource_yaml(kind, name, namespace)
-		if yaml then
-			vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(yaml, "\n"))
-		else
-			vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get resource YAML" })
-		end
+		require("kubectl").get_resource_yaml(kind, name, namespace, function(yaml)
+			vim.schedule(function()
+				if yaml then
+					vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(yaml, "\n"))
+				else
+					vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get resource YAML" })
+				end
+			end)
+		end)
 
 		vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
 	end,
