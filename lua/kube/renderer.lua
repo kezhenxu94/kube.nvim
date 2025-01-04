@@ -6,6 +6,7 @@ local highlights = {
     KubeFailed = { fg = "#FF0000" },
     KubeSucceeded = { fg = "#00FFFF" },
     KubeUnknown = { fg = "#808080" },
+    KubeHeader = { bold = true, underline = true },
 }
 
 function M.render(headers, rows, resource_type, namespace)
@@ -47,7 +48,9 @@ function M.format_table(headers, rows)
     end
     
     local lines = {M.format_row(headers, col_widths)}
-    local highlights_to_apply = {}
+    local highlights_to_apply = {
+        { row_idx = 0, highlight = "KubeHeader" }
+    }
     
     for row_idx, row in ipairs(rows) do
         table.insert(lines, M.format_row(row, col_widths))
