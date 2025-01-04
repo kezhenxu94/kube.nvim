@@ -74,9 +74,7 @@ function KubeBuffer:setup(buf_name, headers, rows)
 		if row.highlight then
 			vim.api.nvim_buf_add_highlight(self.buf, -1, row.highlight, row_num - 1, 0, -1)
 			if row_num > 0 and row.raw then
-				local mark_id = vim.api.nvim_buf_set_extmark(self.buf, ns_id, row_num - 1, 0, {
-					id = row.raw.name,
-				})
+				local mark_id = vim.api.nvim_buf_set_extmark(self.buf, ns_id, row_num - 1, 0, {})
 				self.mark_mappings[mark_id] = row.raw
 			end
 		end
@@ -89,7 +87,6 @@ function KubeBuffer:setup(buf_name, headers, rows)
 		if #marks > 0 then
 			local mark_id = marks[1][1]
 			local resource = self.mark_mappings[mark_id]
-			print(vim.inspect(require("kube.actions")[resource.kind:lower()]))
 			require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
 		end
 	end, { buffer = self.buf })

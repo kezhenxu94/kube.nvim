@@ -1,28 +1,27 @@
 local utils = require("kube.utils")
 
----@class Formatter
-local M = {}
+---@type Formatter
+local M = {
+	headers = {
+		"NAME",
+		"NAMESPACE",
+		"AGE",
+	},
 
-M.headers = {
-	"NAME",
-	"NAMESPACE",
-	"AGE",
+	format = function(data)
+		local rows = {}
+		for _, item in ipairs(data.items) do
+			table.insert(rows, {
+				row = {
+					item.metadata.name,
+					item.metadata.namespace,
+					utils.calculate_age(item.metadata.creationTimestamp),
+				},
+				item = item,
+			})
+		end
+		return rows
+	end,
 }
 
-function M.format(data)
-	local rows = {}
-	for _, item in ipairs(data.items) do
-		table.insert(rows, {
-			row = {
-				item.metadata.name,
-				item.metadata.namespace,
-				utils.calculate_age(item.metadata.creationTimestamp),
-			},
-			item = item,
-		})
-	end
-	return rows
-end
-
 return M
-

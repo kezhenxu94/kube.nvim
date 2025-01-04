@@ -6,9 +6,14 @@
 ---@field item table The original resource item data
 
 ---@type Formatter
-local M = {}
+local M = {
+	headers = {},
+	format = function()
+		return {}
+	end,
+}
 
-M.formatters = {
+local formatters = {
 	pods = require("kube.formatters.pods"),
 	deployments = require("kube.formatters.deployments"),
 	nodes = require("kube.formatters.nodes"),
@@ -17,10 +22,11 @@ M.formatters = {
 	ingresses = require("kube.formatters.ingresses"),
 	configmaps = require("kube.formatters.configmaps"),
 	secrets = require("kube.formatters.secrets"),
+	containers = require("kube.formatters.containers"),
 }
 
 return setmetatable(M, {
 	__index = function(_, key)
-		return M.formatters[key] or require("kube.formatters.default")
+		return formatters[key] or require("kube.formatters.default")
 	end,
 })
