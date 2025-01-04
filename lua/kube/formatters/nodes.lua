@@ -1,34 +1,39 @@
-local base = require('kube.formatters.base')
+local base = require("kube.formatters.base")
 
+---@class Formatter
 local M = {}
 
 M.headers = {
-    "NAME",
-    "STATUS",
-    "ROLES",
-    "AGE",
-    "VERSION"
+	"NAME",
+	"STATUS",
+	"ROLES",
+	"AGE",
+	"VERSION",
 }
 
 function M.format(data)
-    local rows = {}
-    for _, item in ipairs(data.items) do
-        local roles = {}
-        for label, value in pairs(item.metadata.labels or {}) do
-            if label:match("^node%-role.kubernetes.io/") then
-                table.insert(roles, label:match("node%-role.kubernetes.io/(.+)"))
-            end
-        end
+	local rows = {}
+	for _, item in ipairs(data.items) do
+		local roles = {}
+		for label, _ in pairs(item.metadata.labels or {}) do
+			if label:match("^node%-role.kubernetes.io/") then
+				table.insert(roles, label:match("node%-role.kubernetes.io/(.+)"))
+			end
+		end
 
-        table.insert(rows, {
-            item.metadata.name,
-            table.concat(item.status.conditions[#item.status.conditions].type, ","),
-            table.concat(roles, ","),
-            base.calculate_age(item.metadata.creationTimestamp),
-            item.status.nodeInfo.kubeletVersion
-        })
-    end
-    return rows
+		table.insert(rows, {
+			row = {
+				item.metadata.name,
+				table.concat(item.status.conditions[#item.status.conditions].type, ","),
+				table.concat(roles, ","),
+				base.calculate_age(item.metadata.creationTimestamp),
+				item.status.nodeInfo.kubeletVersion,
+			},
+			item = item,
+		})
+	end
+	return rows
 end
 
-return M 
+return M
+

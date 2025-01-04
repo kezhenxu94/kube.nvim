@@ -1,35 +1,46 @@
-local base = require('kube.formatters.base')
+local base = require("kube.formatters.base")
 
+---@class Formatter
 local M = {}
 
 M.headers = {
-    "NAME",
-    "CLASS",
-    "HOSTS",
-    "ADDRESS",
-    "PORTS",
-    "AGE"
+	"NAME",
+	"CLASS",
+	"HOSTS",
+	"ADDRESS",
+	"PORTS",
+	"AGE",
 }
 
 function M.format(data)
-    local rows = {}
-    for _, item in ipairs(data.items) do
-        local hosts = {}
-        for _, rule in ipairs(item.spec.rules or {}) do
-            table.insert(hosts, rule.host or "*")
-        end
+	local rows = {}
+	for _, item in ipairs(data.items) do
+		local hosts = {}
+		for _, rule in ipairs(item.spec.rules or {}) do
+			table.insert(hosts, rule.host or "*")
+		end
 
-        table.insert(rows, {
-            item.metadata.name,
-            item.spec.ingressClassName or "<none>",
-            table.concat(hosts, ","),
-            item.status.loadBalancer and item.status.loadBalancer.ingress and
-                item.status.loadBalancer.ingress[1].ip or "<pending>",
-            "80",  -- Most common case, you might want to make this more dynamic
-            base.calculate_age(item.metadata.creationTimestamp),
-        })
-    end
-    return rows
+		local ports = {}
+		for _, port in ipairs(item.spec.ports or {}) do
+			table.insert(ports, string.format("%d/%s", port.port, port.protocol or "TCP"))
+		end
+
+		table.insert(rows, {
+			row = {
+				item.metadata.name,
+				item.spec.ingressClassName or "<none>",
+				table.concat(hosts, ","),
+				item.status.loadBalancer
+						and item.status.loadBalancer.ingress
+						and item.status.loadBalancer.ingress[1].ip
+					or "<pending>",
+				table.concat(ports, ","),
+				base.calculate_age(item.metadata.creationTimestamp),
+			},
+			item = item,
+		})
+	end
+	return rows
 end
 
-return M 
+return M
