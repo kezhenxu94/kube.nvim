@@ -9,29 +9,52 @@ local highlights = {
 	KubeHeader = { bold = true, underline = true },
 }
 
-_G.kube_buffers = {}
+---@class KubeBuffer
+---@field buf number The buffer number
+---@field mark_mappings table<number, table> Mapping of mark IDs to row data
+local KubeBuffer = {}
+KubeBuffer.__index = KubeBuffer
 
+---Create a new KubeBuffer instance
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@param resource_type string The type of resource being rendered
 ---@param namespace string The namespace of the resource being rendered
-function M.render(headers, rows, resource_type, namespace)
+---@return KubeBuffer
+function KubeBuffer.new(headers, rows, resource_type, namespace)
 	local buf_name = string.format("kube://%s/%s", namespace or "default", resource_type)
 	local buf = vim.api.nvim_create_buf(false, true)
-	kube_buffers[buf] = {
-		mark_mappings = {},
-	}
 
+	local self = setmetatable({
+		buf = buf,
+		mark_mappings = {},
+	}, KubeBuffer)
+
+	_G.kube_buffers = _G.kube_buffers or {}
+	_G.kube_buffers[buf] = self
+
+	vim.api.nvim_create_autocmd("BufDelete", {
+		buffer = buf,
+		callback = function()
+			_G.kube_buffers[buf] = nil
+		end,
+	})
+
+	self:setup(buf_name, headers, rows)
+	return self
+end
+
+function KubeBuffer:setup(buf_name, headers, rows)
 	local existing_buf = vim.fn.bufnr(buf_name)
 	if existing_buf ~= -1 then
 		vim.api.nvim_buf_delete(existing_buf, { force = true })
 	end
-	vim.api.nvim_buf_set_name(buf, buf_name)
+	vim.api.nvim_buf_set_name(self.buf, buf_name)
 
-	vim.api.nvim_buf_set_option(buf, "modifiable", true)
-	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-	vim.api.nvim_buf_set_option(buf, "swapfile", false)
-	vim.api.nvim_set_current_buf(buf)
+	vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf })
+	vim.api.nvim_set_option_value("buftype", "nofile", { buf = self.buf })
+	vim.api.nvim_set_option_value("swapfile", false, { buf = self.buf })
+	vim.api.nvim_set_current_buf(self.buf)
 
 	for group, colors in pairs(highlights) do
 		vim.api.nvim_set_hl(0, group, colors)
@@ -45,32 +68,32 @@ function M.render(headers, rows, resource_type, namespace)
 	for _, row in ipairs(formatted_rows) do
 		table.insert(lines, row.formatted)
 	end
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, lines)
 
 	for row_num, row in ipairs(formatted_rows) do
 		if row.highlight then
-			vim.api.nvim_buf_add_highlight(buf, -1, row.highlight, row_num - 1, 0, -1)
+			vim.api.nvim_buf_add_highlight(self.buf, -1, row.highlight, row_num - 1, 0, -1)
 			if row_num > 0 and row.raw then
-				local mark_id = vim.api.nvim_buf_set_extmark(buf, ns_id, row_num - 1, 0, {
+				local mark_id = vim.api.nvim_buf_set_extmark(self.buf, ns_id, row_num - 1, 0, {
 					id = row.raw.name,
 				})
-				kube_buffers[buf].mark_mappings[mark_id] = row.raw
+				self.mark_mappings[mark_id] = row.raw
 			end
 		end
 	end
 
 	vim.keymap.set("n", "<c-]>", function()
 		local line = vim.api.nvim_win_get_cursor(0)[1]
-		local marks = vim.api.nvim_buf_get_extmarks(buf, ns_id, line, line, { details = true })
+		local marks = vim.api.nvim_buf_get_extmarks(self.buf, ns_id, line, line, { details = true })
 
 		if #marks > 0 then
 			local mark_id = marks[1][1]
-			local record = kube_buffers[buf].mark_mappings[mark_id]
-			M.show_resource_yaml(record)
+			local resource = self.mark_mappings[mark_id]
+			require("kube.actions").drill_down_resource(resource)
 		end
-	end, { buffer = buf })
+	end, { buffer = self.buf })
 
-	vim.api.nvim_buf_set_option(buf, "modifiable", false)
+	vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf })
 end
 
 ---@class FormattedTableRow
@@ -121,33 +144,13 @@ function M.align_row(row, col_widths)
 	return table.concat(formatted_cols, "  ")
 end
 
-function M.show_resource_yaml(item)
-    local kind = item.kind
-    local name = item.metadata.name
-    local namespace = item.metadata.namespace
-
-	local buf_name = string.format("kube://%s/%s/%s.yaml", namespace, string.lower(kind), name)
-	
-	vim.cmd('vsplit')
-	
-	local buf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_name(buf, buf_name)
-	
-	vim.api.nvim_buf_set_option(buf, "modifiable", true)
-	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-	vim.api.nvim_buf_set_option(buf, "swapfile", false)
-	vim.api.nvim_buf_set_option(buf, "filetype", "yaml")
-	
-	vim.api.nvim_set_current_buf(buf)
-	
-	local yaml = require("kubectl").get_resource_yaml(kind, name, namespace)
-	if yaml then
-		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(yaml, "\n"))
-	else
-		vim.api.nvim_buf_set_lines(buf, 0, -1, false, {"Failed to get resource YAML"})
-	end
-	
-	vim.api.nvim_buf_set_option(buf, "modifiable", false)
+---Create and render a new buffer
+---@param headers string[] List of column headers
+---@param rows FormattedRow[] List of row data
+---@param resource_type string The type of resource being rendered
+---@param namespace string The namespace of the resource being rendered
+function M.render(headers, rows, resource_type, namespace)
+	return KubeBuffer.new(headers, rows, resource_type, namespace)
 end
 
 return M
