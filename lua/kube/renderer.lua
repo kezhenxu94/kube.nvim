@@ -122,7 +122,32 @@ function M.align_row(row, col_widths)
 end
 
 function M.show_resource_yaml(item)
-	print("item: " .. vim.inspect(item))
+    local kind = item.kind
+    local name = item.metadata.name
+    local namespace = item.metadata.namespace
+
+	local buf_name = string.format("kube://%s/%s/%s.yaml", namespace, string.lower(kind), name)
+	
+	vim.cmd('vsplit')
+	
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_name(buf, buf_name)
+	
+	vim.api.nvim_buf_set_option(buf, "modifiable", true)
+	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+	vim.api.nvim_buf_set_option(buf, "swapfile", false)
+	vim.api.nvim_buf_set_option(buf, "filetype", "yaml")
+	
+	vim.api.nvim_set_current_buf(buf)
+	
+	local yaml = require("kubectl").get_resource_yaml(kind, name, namespace)
+	if yaml then
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(yaml, "\n"))
+	else
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, {"Failed to get resource YAML"})
+	end
+	
+	vim.api.nvim_buf_set_option(buf, "modifiable", false)
 end
 
 return M
