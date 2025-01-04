@@ -89,7 +89,8 @@ function KubeBuffer:setup(buf_name, headers, rows)
 		if #marks > 0 then
 			local mark_id = marks[1][1]
 			local resource = self.mark_mappings[mark_id]
-			require("kube.actions").drill_down_resource(resource)
+			print(vim.inspect(require("kube.actions")[resource.kind:lower()]))
+			require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
 		end
 	end, { buffer = self.buf })
 

@@ -1,4 +1,4 @@
-local base = require("kube.formatters.base")
+local utils = require("kube.utils")
 
 ---@class Formatter
 local M = {}
@@ -23,7 +23,7 @@ function M.format(data)
 			row = {
 				item.metadata.name,
 				tostring(data_count),
-				base.calculate_age(item.metadata.creationTimestamp),
+				utils.calculate_age(item.metadata.creationTimestamp),
 			},
 			item = item,
 		})

@@ -1,4 +1,4 @@
-local base = require("kube.formatters.base")
+local utils = require("kube.utils")
 
 ---@class Formatter
 local M = {}
@@ -37,7 +37,7 @@ function M.format(data)
 				tostring(restarts),
 				pod.status.podIP or "",
 				pod.spec.nodeName or "",
-				base.calculate_age(pod.metadata.creationTimestamp),
+				utils.calculate_age(pod.metadata.creationTimestamp),
 				highlight = "Kube" .. status,
 			},
 			item = pod,

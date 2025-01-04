@@ -1,4 +1,4 @@
-local base = require("kube.formatters.base")
+local utils = require("kube.utils")
 
 ---@class Formatter
 local M = {}
@@ -26,7 +26,7 @@ function M.format(data)
 				item.metadata.name,
 				table.concat(item.status.conditions[#item.status.conditions].type, ","),
 				table.concat(roles, ","),
-				base.calculate_age(item.metadata.creationTimestamp),
+				utils.calculate_age(item.metadata.creationTimestamp),
 				item.status.nodeInfo.kubeletVersion,
 			},
 			item = item,
