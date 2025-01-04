@@ -40,11 +40,11 @@ function KubeBuffer.new(headers, rows, resource_type, namespace)
 		end,
 	})
 
-	self:setup(buf_name, headers, rows)
+	self:setup(buf_name, resource_type, namespace, headers, rows)
 	return self
 end
 
-function KubeBuffer:setup(buf_name, headers, rows)
+function KubeBuffer:setup(buf_name, resource_type, namespace, headers, rows)
 	local existing_buf = vim.fn.bufnr(buf_name)
 	if existing_buf ~= -1 then
 		vim.api.nvim_buf_delete(existing_buf, { force = true })
@@ -89,6 +89,11 @@ function KubeBuffer:setup(buf_name, headers, rows)
 			local resource = self.mark_mappings[mark_id]
 			require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
 		end
+	end, { buffer = self.buf })
+
+	vim.keymap.set("n", "<c-r>", function()
+		vim.notify("Refreshing " .. resource_type .. " in " .. namespace)
+		require("kube").show_resources(resource_type, namespace)
 	end, { buffer = self.buf })
 
 	vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf })

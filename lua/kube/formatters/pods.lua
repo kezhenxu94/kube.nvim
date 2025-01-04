@@ -2,12 +2,13 @@ local utils = require("kube.utils")
 
 ---@type Formatter
 local M = {
-	headers = { "NAME", "READY", "STATUS", "RESTARTS", "IP", "NODE", "AGE" },
+	headers = { "NAMESPACE", "NAME", "READY", "STATUS", "RESTARTS", "IP", "NODE", "AGE" },
 
 	format = function(data)
 		local rows = {}
 		for _, pod in ipairs(data.items) do
 			local name = pod.metadata.name
+			local namespace = pod.metadata.namespace
 			local status = pod.status.phase
 
 			local ready_count = 0
@@ -30,6 +31,7 @@ local M = {
 
 			table.insert(rows, {
 				row = {
+					namespace,
 					name,
 					ready,
 					status,
