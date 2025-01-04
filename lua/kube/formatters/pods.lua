@@ -10,7 +10,6 @@ function M.format(data)
         local name = pod.metadata.name
         local status = pod.status.phase
         
-        -- Calculate ready count
         local ready_count = 0
         local container_count = #pod.spec.containers
         if pod.status.containerStatuses then
@@ -20,7 +19,6 @@ function M.format(data)
         end
         local ready = string.format("%d/%d", ready_count, container_count)
         
-        -- Calculate restarts
         local restarts = 0
         if pod.status.containerStatuses then
             for _, container in ipairs(pod.status.containerStatuses) do

@@ -5,7 +5,13 @@ local M = {}
 
 local formatters = {
     pods = require('kube.formatters.pods'),
-    -- Add other resource formatters here
+    deployments = require('kube.formatters.deployments'),
+    nodes = require('kube.formatters.nodes'),
+    namespaces = require('kube.formatters.namespaces'),
+    services = require('kube.formatters.services'),
+    ingresses = require('kube.formatters.ingresses'),
+    configmaps = require('kube.formatters.configmaps'),
+    secrets = require('kube.formatters.secrets'),
 }
 
 function M.show_resources(resource_type, namespace)
