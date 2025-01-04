@@ -1,11 +1,33 @@
-local M = {}
-
 ---@class Formatter
 ---@field headers string[] List of column headers
 ---@field format fun(data: table): FormattedRow[] Function that takes raw data and returns formatted rows
 ---@class FormattedRow
 ---@field row table The row data containing column values
 ---@field item table The original resource item data
+
+---@class Formatter
+local M = {}
+
+M.headers = {
+	"NAME",
+	"NAMESPACE",
+	"AGE",
+}
+
+function M.format(data)
+	local rows = {}
+	for _, item in ipairs(data.items) do
+		table.insert(rows, {
+			row = {
+				item.metadata.name,
+				item.metadata.namespace,
+				M.calculate_age(item.metadata.creationTimestamp),
+			},
+			item = item,
+		})
+	end
+	return rows
+end
 
 function M.calculate_age(created)
 	local year = created:sub(1, 4)

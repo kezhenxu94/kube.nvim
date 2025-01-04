@@ -13,9 +13,10 @@ local formatters = {
 	configmaps = require("kube.formatters.configmaps"),
 	secrets = require("kube.formatters.secrets"),
 }
+local base = require("kube.formatters.base")
 
 function M.show_resources(resource_type, namespace)
-	local formatter = formatters[resource_type]
+	local formatter = formatters[resource_type] or base
 	if not formatter then
 		error("Unsupported resource type: " .. resource_type)
 		return
