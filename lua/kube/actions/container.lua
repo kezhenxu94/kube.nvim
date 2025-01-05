@@ -25,9 +25,6 @@ local M = {
 
 		vim.api.nvim_set_current_buf(buf)
 
-		vim.wo.number = false
-		vim.wo.relativenumber = false
-
 		local cmd = string.format(
 			"kubectl exec -it -n %s %s -c %s -- bash || sh",
 			parent.namespace or "default",
@@ -35,6 +32,9 @@ local M = {
 			resource.name
 		)
 		vim.fn.termopen(cmd)
+		vim.opt_local.number = false
+		vim.opt_local.relativenumber = false
+		vim.cmd("file " .. buf_name)
 		vim.cmd("startinsert")
 	end,
 }
