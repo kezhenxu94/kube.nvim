@@ -1,12 +1,12 @@
 local M = {}
 
 local highlights = {
-	KubePending = { fg = "#FFA500" },
-	KubeRunning = { fg = "#00FF00" },
-	KubeFailed = { fg = "#FF0000" },
-	KubeSucceeded = { fg = "#00FFFF" },
-	KubeUnknown = { fg = "#808080" },
-	KubeHeader = { bold = true, underline = true },
+	KubePending = { fg = "#fe640b" },
+	KubeRunning = { fg = "#40a02b" },
+	KubeFailed = { fg = "#d20f39" },
+	KubeSucceeded = { fg = "#9ca0b0" },
+	KubeUnknown = { fg = "#6c6f85" },
+	KubeHeader = { fg = "#df8e1d", bold = true, underline = true },
 }
 
 ---@class KubeBuffer
@@ -80,7 +80,7 @@ function KubeBuffer:setup(buf_name, resource_type, namespace, headers, rows)
 		end
 	end
 
-	vim.keymap.set("n", "<c-]>", function()
+	vim.keymap.set("n", "gd", function()
 		local line = vim.api.nvim_win_get_cursor(0)[1]
 		local marks = vim.api.nvim_buf_get_extmarks(self.buf, ns_id, line, line, { details = true })
 
