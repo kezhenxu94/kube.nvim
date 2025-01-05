@@ -1,5 +1,4 @@
 local constants = require("kube.constants")
-local config = require("kube.config").values
 local log = require("kube.log")
 
 local M = {}
@@ -13,6 +12,7 @@ local highlights = {
 	KubeHeader = { fg = "#df8e1d", bold = true, underline = true },
 }
 
+---@type table<number, KubeBuffer>
 _G.kube_buffers = {}
 
 ---@class KubeBuffer
@@ -83,40 +83,6 @@ function KubeBuffer:setup()
 	for group, colors in pairs(highlights) do
 		vim.api.nvim_set_hl(0, group, colors)
 	end
-
-	self:setup_buffer_keymaps()
-end
-
-function KubeBuffer:setup_buffer_keymaps()
-	local buf = self.buf_nr
-	local resource_kind = self.resource_kind
-	local namespace = self.namespace
-	local mark_mappings = self.mark_mappings
-
-	vim.keymap.set("n", config.keymaps.drill_down, function()
-		local line = vim.api.nvim_win_get_cursor(0)[1]
-		if line == 1 then
-			return
-		end
-
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
-
-		if #marks > 0 then
-			local mark_id = marks[1][1]
-			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", vim.inspect(resource))
-
-			if resource and resource.kind then
-				require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
-			end
-		end
-	end, { buffer = buf })
-
-	vim.keymap.set("n", config.keymaps.refresh, function()
-		vim.notify("Refreshing " .. resource_kind .. " in " .. namespace)
-
-		self:load()
-	end, { buffer = buf })
 end
 
 function KubeBuffer:load()
