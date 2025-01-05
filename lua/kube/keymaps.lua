@@ -1,6 +1,9 @@
 local M = {}
 
-function M.setup_buffer_keymaps(buf, ns_id, mark_mappings, resource_type, namespace)
+function M.setup_buffer_keymaps(self, ns_id, resource_type, namespace)
+	local buf = self.buf
+	local mark_mappings = self.mark_mappings
+
 	vim.keymap.set("n", "gd", function()
 		local line = vim.api.nvim_win_get_cursor(0)[1]
 		local marks = vim.api.nvim_buf_get_extmarks(buf, ns_id, line, line, { details = true })
@@ -19,4 +22,3 @@ function M.setup_buffer_keymaps(buf, ns_id, mark_mappings, resource_type, namesp
 end
 
 return M
-

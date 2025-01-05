@@ -16,13 +16,13 @@ local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer
 
 ---Create a new KubeBuffer instance
+---@param buf_name string The name of the buffer
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@param resource_type string The type of resource being rendered
 ---@param namespace string The namespace of the resource being rendered
 ---@return KubeBuffer
-function KubeBuffer.new(headers, rows, resource_type, namespace)
-	local buf_name = string.format("kube://%s/%s", namespace or "default", resource_type)
+function KubeBuffer.new(buf_name, headers, rows, resource_type, namespace)
 	local buf = vim.api.nvim_create_buf(false, true)
 
 	local self = setmetatable({
@@ -80,13 +80,7 @@ function KubeBuffer:setup(buf_name, resource_type, namespace, headers, rows)
 		end
 	end
 
-	require("kube.keymaps").setup_buffer_keymaps(
-		self.buf,
-		ns_id,
-		self.mark_mappings,
-		resource_type,
-		namespace
-	)
+	require("kube.keymaps").setup_buffer_keymaps(self, ns_id, resource_type, namespace)
 
 	vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf })
 end
@@ -140,12 +134,13 @@ function M.align_row(row, col_widths)
 end
 
 ---Create and render a new buffer
+---@param buf_name string The name of the buffer
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@param resource_type string The type of resource being rendered
 ---@param namespace string The namespace of the resource being rendered
-function M.render(headers, rows, resource_type, namespace)
-	return KubeBuffer.new(headers, rows, resource_type, namespace)
+function M.render(buf_name, headers, rows, resource_type, namespace)
+	return KubeBuffer.new(buf_name, headers, rows, resource_type, namespace)
 end
 
 return M
