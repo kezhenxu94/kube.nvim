@@ -1,4 +1,6 @@
 local Job = require("plenary.job")
+local log = require("kube.log")
+
 local M = {}
 
 ---@param cmd string The command to execute
@@ -18,17 +20,23 @@ local function kubectl(cmd, callback)
 	}):start()
 end
 
----@param resource_type string The type of resource
+---@param resource_kind string The type of resource
 ---@param name string|nil The name of the resource, or nil to list all resources of the given type
----@param namespace string The namespace of the resource
+---@param namespace string|nil The namespace of the resource, or nil to list all resources in all namespaces
 ---@param callback function Callback function to handle the output
-function M.get(resource_type, name, namespace, callback)
-	local cmd = "get " .. resource_type .. " -o json"
+function M.get(resource_kind, name, namespace, callback)
+    log.debug("kubectl.get", resource_kind, name, namespace)
+
+	local cmd = "get " .. resource_kind .. " -o json"
 	if name then
 		cmd = cmd .. " " .. name
 	end
 	if namespace then
-		cmd = cmd .. " -n " .. namespace
+        if namespace:lower() == "all" then
+            cmd = cmd .. " --all-namespaces"
+        else
+            cmd = cmd .. " -n " .. namespace
+        end
 	end
 	kubectl(cmd, callback)
 end
@@ -39,12 +47,12 @@ function M.apply(file_path, callback)
 	kubectl("apply -f " .. file_path, callback)
 end
 
----@param resource_type string The type of resource
+---@param resource_kind string The type of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
 ---@param callback function Callback function to handle the output
-function M.delete(resource_type, name, namespace, callback)
-	local cmd = "delete " .. resource_type .. " " .. name
+function M.delete(resource_kind, name, namespace, callback)
+	local cmd = "delete " .. resource_kind .. " " .. name
 	if namespace then
 		cmd = cmd .. " -n " .. namespace
 	end
@@ -56,6 +64,8 @@ end
 ---@param namespace string The namespace of the resource
 ---@param callback function Callback function to handle the output
 function M.get_resource_yaml(kind, name, namespace, callback)
+    log.debug("kubectl.get_resource_yaml", kind, name, namespace)
+
 	local cmd = string.format("get %s %s -n %s -o yaml", string.lower(kind), name, namespace or "default")
 	kubectl(cmd, callback)
 end

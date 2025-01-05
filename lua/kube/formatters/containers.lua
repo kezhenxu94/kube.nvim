@@ -64,7 +64,7 @@ local M = {
 			end
 
 			local status = container_statuses[container.name] or "Unknown"
-            
+
 			table.insert(rows, {
 				row = {
 					container.name,
@@ -82,4 +82,3 @@ local M = {
 }
 
 return M
-

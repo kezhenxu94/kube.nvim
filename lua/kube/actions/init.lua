@@ -1,15 +1,15 @@
 ---@class Actions
 ---@field drill_down_resource fun(resource: table)
 
----@type table<string, Actions>
-local M = {}
-
-M.actions = {
+local actions = {
 	pod = require("kube.actions.pod"),
 }
 
+---@type table<string, Actions>
+local M = {}
+
 return setmetatable(M, {
 	__index = function(_, key)
-		return M.actions[key] or require("kube.actions.default")
+		return actions[key] or require("kube.actions.default")
 	end,
 })

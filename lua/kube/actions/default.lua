@@ -12,7 +12,7 @@ local M = {
 		vim.api.nvim_set_option_value("modifiable", true, { buf = buf })
 		vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
 		vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
-		vim.api.nvim_set_option_value("filetype", "kube.yaml", { buf = buf })
+		vim.api.nvim_set_option_value("filetype", "yaml", { buf = buf })
 
 		vim.api.nvim_set_current_buf(buf)
 
@@ -23,10 +23,10 @@ local M = {
 				else
 					vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get resource YAML" })
 				end
+
+				vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
 			end)
 		end)
-
-		vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
 	end,
 }
 
