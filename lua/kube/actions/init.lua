@@ -1,6 +1,7 @@
 ---@class Actions
 ---@field drill_down_resource fun(resource: table)
 
+---@type table<string, Actions>
 local M = {}
 
 M.actions = {

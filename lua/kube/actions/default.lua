@@ -12,7 +12,7 @@ local M = {
 		vim.api.nvim_set_option_value("modifiable", true, { buf = buf })
 		vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
 		vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
-		vim.api.nvim_set_option_value("filetype", "yaml", { buf = buf })
+		vim.api.nvim_set_option_value("filetype", "kube.yaml", { buf = buf })
 
 		vim.api.nvim_set_current_buf(buf)
 

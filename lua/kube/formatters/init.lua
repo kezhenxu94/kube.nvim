@@ -5,14 +5,6 @@
 ---@field row table The row data containing column values
 ---@field item table The original resource item data
 
----@type Formatter
-local M = {
-	headers = {},
-	format = function()
-		return {}
-	end,
-}
-
 local formatters = {
 	pods = require("kube.formatters.pods"),
 	deployments = require("kube.formatters.deployments"),
@@ -24,6 +16,9 @@ local formatters = {
 	secrets = require("kube.formatters.secrets"),
 	containers = require("kube.formatters.containers"),
 }
+
+---@type table<string, Formatter>
+local M = {}
 
 return setmetatable(M, {
 	__index = function(_, key)

@@ -1,3 +1,5 @@
+local constants = require("kube.constants")
+
 local M = {}
 
 local highlights = {
@@ -8,6 +10,8 @@ local highlights = {
 	KubeUnknown = { fg = "#6c6f85" },
 	KubeHeader = { fg = "#df8e1d", bold = true, underline = true },
 }
+
+_G.kube_buffers = {}
 
 ---@class KubeBuffer
 ---@field buf number The buffer number
@@ -28,9 +32,10 @@ function KubeBuffer.new(buf_name, headers, rows, resource_type, namespace)
 	local self = setmetatable({
 		buf = buf,
 		mark_mappings = {},
+		resource_type = resource_type,
+		namespace = namespace,
 	}, KubeBuffer)
 
-	_G.kube_buffers = _G.kube_buffers or {}
 	_G.kube_buffers[buf] = self
 
 	vim.api.nvim_create_autocmd("BufDelete", {
@@ -54,13 +59,12 @@ function KubeBuffer:setup(buf_name, resource_type, namespace, headers, rows)
 	vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf })
 	vim.api.nvim_set_option_value("buftype", "nofile", { buf = self.buf })
 	vim.api.nvim_set_option_value("swapfile", false, { buf = self.buf })
+	vim.api.nvim_set_option_value("filetype", "kube", { buf = self.buf })
 	vim.api.nvim_set_current_buf(self.buf)
 
 	for group, colors in pairs(highlights) do
 		vim.api.nvim_set_hl(0, group, colors)
 	end
-
-	local ns_id = vim.api.nvim_create_namespace("kube")
 
 	local formatted_rows = M.format_table(headers, rows)
 
@@ -74,13 +78,11 @@ function KubeBuffer:setup(buf_name, resource_type, namespace, headers, rows)
 		if row.highlight then
 			vim.api.nvim_buf_add_highlight(self.buf, -1, row.highlight, row_num - 1, 0, -1)
 			if row_num > 0 and row.raw then
-				local mark_id = vim.api.nvim_buf_set_extmark(self.buf, ns_id, row_num - 1, 0, {})
+				local mark_id = vim.api.nvim_buf_set_extmark(self.buf, constants.KUBE_NAMESPACE, row_num - 1, 0, {})
 				self.mark_mappings[mark_id] = row.raw
 			end
 		end
 	end
-
-	require("kube.keymaps").setup_buffer_keymaps(self, ns_id, resource_type, namespace)
 
 	vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf })
 end

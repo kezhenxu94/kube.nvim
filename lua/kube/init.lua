@@ -3,6 +3,15 @@ local renderer = require("kube.renderer")
 
 local M = {}
 
+---@param opts table|nil
+function M.setup(opts)
+	opts = opts or {}
+
+	require("kube.config").setup(opts)
+
+	require("kube.autocmds").setup()
+end
+
 function M.show_resources(resource_kind, namespace)
 	local formatter = require("kube.formatters")[resource_kind]
 	kubectl.get(resource_kind, nil, namespace, function(result)
