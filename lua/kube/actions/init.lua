@@ -1,8 +1,14 @@
+---@class ParentResource
+---@field kind string
+---@field name string?
+---@field namespace string?
 ---@class Actions
----@field drill_down_resource fun(resource: table)
+---@field drill_down_resource fun(resource: table, parent: ParentResource|nil)
 
 local actions = {
 	pod = require("kube.actions.pod"),
+	container = require("kube.actions.container"),
+	containers = require("kube.actions.container"),
 }
 
 ---@type table<string, Actions>

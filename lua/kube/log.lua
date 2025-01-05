@@ -1,5 +1,4 @@
-_G.__is_log = false
-
+---@diagnostic disable: undefined-field
 if _G.__is_log then
 	return require("plenary.log").new({
 		plugin = "kube.nvim",
@@ -12,4 +11,3 @@ else
 		error = function(...) end,
 	}
 end
-

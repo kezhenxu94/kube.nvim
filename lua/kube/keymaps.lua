@@ -10,6 +10,8 @@ function M.setup_buffer_keymaps(buf_nr)
 	local resource_kind = kbuf.resource_kind
 	local namespace = kbuf.namespace
 	local mark_mappings = kbuf.mark_mappings
+	local subresource_kind = kbuf.subresource_kind
+	log.debug("resource_kind", resource_kind, "namespace", namespace, "subresource_kind", subresource_kind)
 
 	vim.keymap.set("n", config.keymaps.drill_down, function()
 		local line = vim.api.nvim_win_get_cursor(0)[1]
@@ -24,8 +26,14 @@ function M.setup_buffer_keymaps(buf_nr)
 			local resource = mark_mappings[mark_id]
 			log.debug("resource under cursor", vim.inspect(resource))
 
-			if resource and resource.kind then
+			if resource.kind then
 				require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
+			elseif subresource_kind then
+				require("kube.actions")[subresource_kind:lower()].drill_down_resource(resource, {
+					kind = kbuf.resource_kind,
+					name = kbuf.resource_name,
+					namespace = kbuf.namespace,
+				})
 			end
 		end
 	end, { buffer = buf })
@@ -41,8 +49,8 @@ function M.setup_buffer_keymaps(buf_nr)
 		if kbuf.resource_name then
 			table.insert(parts, kbuf.resource_name)
 		end
-		if kbuf.subresource_name then
-			table.insert(parts, kbuf.subresource_name)
+		if kbuf.subresource_kind then
+			table.insert(parts, kbuf.subresource_kind)
 		end
 		vim.notify(string.format("Refreshing %s", table.concat(parts, "/")))
 
