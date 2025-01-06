@@ -9,12 +9,21 @@ local renderers = {
 local M = {}
 
 function M.load(buffer)
-	local renderer = renderers[buffer.resource_kind]
-	if renderer then
-		renderer.load(buffer)
-	else
-		require("kube.renderers.default").load(buffer)
+	local self = buffer
+	local resource_kind = self.resource_kind
+	local resource_name = self.resource_name
+	local subresource_kind = self.subresource_kind
+	local namespace = self.namespace
+
+	local renderer = require("kube.renderers.default")
+	if resource_kind and renderers[resource_kind] then
+		renderer = renderers[resource_kind]
 	end
+	if subresource_kind and renderers[subresource_kind] then
+		renderer = renderers[subresource_kind]
+	end
+
+	renderer.load(buffer)
 end
 
 return M

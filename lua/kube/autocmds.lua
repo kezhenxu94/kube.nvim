@@ -9,12 +9,13 @@ local M = {}
 augroup("kube_autocmds", { clear = true })
 
 function M.setup()
-	autocmd({ "BufEnter" }, {
+	autocmd("BufEnter", {
 		group = "kube_autocmds",
 		pattern = "kube://*",
 		callback = function(ev)
-			local buf_name = vim.api.nvim_buf_get_name(ev.buf)
-			log.debug("configuring buffer", buf_name)
+			log.debug("entered buffer", ev.buf)
+
+			local buf = KubeBuffer:new(ev.buf)
 
 			require("kube.keymaps").setup_buffer_keymaps(ev.buf)
 		end,
@@ -30,18 +31,29 @@ function M.setup()
 			local buf = KubeBuffer:new(ev.buf)
 			buf:setup()
 			buf:load()
+
+			require("kube.keymaps").setup_buffer_keymaps(ev.buf)
 		end,
 	})
 
 	autocmd("BufDelete", {
 		group = "kube_autocmds",
 		pattern = "kube://*",
-		callback = function()
-			local buf_name = vim.api.nvim_buf_get_name(0)
-			log.debug("Deleting buffer", buf_name)
+		callback = function(ev)
+			local buf_name = vim.api.nvim_buf_get_name(ev.buf)
+			log.debug("Deleting buffer", buf_name, ev.buf)
 
-			local buf = vim.api.nvim_get_current_buf()
-			_G.kube_buffers[buf] = nil
+			local buf = _G.kube_buffers[ev.buf]
+
+			if buf then
+				for job_id, job in pairs(buf.jobs) do
+					log.debug("shutting down job", job_id)
+					job:shutdown()
+					buf.jobs[job_id] = nil
+				end
+			end
+
+			_G.kube_buffers[ev.buf] = nil
 		end,
 	})
 end

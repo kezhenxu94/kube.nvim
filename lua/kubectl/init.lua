@@ -6,7 +6,7 @@ local M = {}
 ---@param cmd string The command to execute
 ---@param callback function Callback function to handle the output
 local function kubectl(cmd, callback)
-	Job:new({
+	local job = Job:new({
 		command = "kubectl",
 		args = vim.split(cmd, " "),
 		on_exit = function(j, return_val)
@@ -17,7 +17,9 @@ local function kubectl(cmd, callback)
 				callback(nil)
 			end
 		end,
-	}):start()
+	})
+	job:start()
+	return job
 end
 
 ---@param resource_kind string The type of resource
@@ -38,7 +40,7 @@ function M.get(resource_kind, name, namespace, callback)
             cmd = cmd .. " -n " .. namespace
         end
 	end
-	kubectl(cmd, callback)
+	return kubectl(cmd, callback)
 end
 
 ---@param file_path string The path to the YAML file
@@ -56,7 +58,7 @@ function M.delete(resource_kind, name, namespace, callback)
 	if namespace then
 		cmd = cmd .. " -n " .. namespace
 	end
-	kubectl(cmd, callback)
+	return kubectl(cmd, callback)
 end
 
 ---@param kind string The kind of resource
@@ -67,7 +69,62 @@ function M.get_resource_yaml(kind, name, namespace, callback)
     log.debug("kubectl.get_resource_yaml", kind, name, namespace)
 
 	local cmd = string.format("get %s %s -n %s -o yaml", string.lower(kind), name, namespace or "default")
-	kubectl(cmd, callback)
+	return kubectl(cmd, callback)
+end
+
+---@param pod_name string The name of the pod
+---@param container_name string|nil The name of the container, or nil to get logs from the first container
+---@param namespace string The namespace of the pod
+---@param follow boolean|nil Whether to follow the logs (tail -f style)
+---@param callback function Callback function to handle the output
+---@return Job|nil The job object, or nil if the job is not started
+function M.logs(pod_name, container_name, namespace, follow, callback)
+    log.debug("kubectl.logs", pod_name, container_name, namespace, follow)
+
+    local cmd = "logs " .. pod_name
+    if container_name then
+        cmd = cmd .. " -c " .. container_name
+    end
+    if namespace then
+        cmd = cmd .. " -n " .. namespace
+    end
+	
+	if follow then
+		cmd = cmd .. " -f"
+		local job = Job:new({
+			command = "kubectl",
+			args = vim.split(cmd, " "),
+			on_stdout = function(_, data)
+				if data then
+					callback(data)
+				end
+			end,
+			on_stderr = function(_, data)
+				if data then
+					callback(data)
+				end
+			end,
+		})
+		job:start()
+		return job
+	else
+		local job = Job:new({
+			command = "kubectl",
+			args = vim.split(cmd, " "),
+			on_stdout = function(_, data)
+				if data then
+					callback(data)
+				end
+			end,
+			on_stderr = function(_, data)
+				if data then
+					callback(data)
+				end
+			end,
+		})
+		job:start()
+		return job
+	end
 end
 
 return M

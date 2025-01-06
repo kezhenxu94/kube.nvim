@@ -7,6 +7,18 @@ function M.setup(opts)
 	require("kube.config").setup(opts)
 
 	require("kube.autocmds").setup()
+
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		callback = function()
+			for _, buffer in pairs(_G.kube_buffers or {}) do
+				for pid, job in pairs(buffer.jobs) do
+					job:shutdown()
+					buffer.jobs[pid] = nil
+				end
+			end
+		end,
+		desc = "Shutdown all kubectl jobs when exiting vim",
+	})
 end
 
 function M.show_resources(resource_kind, namespace)

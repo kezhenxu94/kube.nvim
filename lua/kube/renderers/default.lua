@@ -21,7 +21,7 @@ function M.load(buffer)
 
 	local headers = formatter.headers
 	local kubectl = require("kubectl")
-	kubectl.get(resource_kind, resource_name, namespace, function(result)
+	local job = kubectl.get(resource_kind, resource_name, namespace, function(result)
 		vim.schedule(function()
 			if not result then
 				log.debug("empty result", namespace, resource_kind, resource_name)
@@ -55,6 +55,10 @@ function M.load(buffer)
 			vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
 		end)
 	end)
+
+	if job then
+		self.jobs[job.pid] = job
+	end
 end
 
 ---@class FormattedTableRow

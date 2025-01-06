@@ -37,6 +37,37 @@ local M = {
 		vim.cmd("file " .. buf_name)
 		vim.cmd("startinsert")
 	end,
+
+	show_logs = function(resource, follow, parent)
+		if not parent then
+			log.error("parent resource is required")
+			return
+		end
+
+		log.debug("showing logs for container", resource.name, "in pod", parent.name)
+
+		local kind = parent.kind:lower()
+		local name = parent.name
+		local namespace = parent.namespace
+		local buf_name
+		local params = {}
+
+		if namespace then
+			buf_name = string.format("kube://namespaces/%s/%s/%s/logs", namespace, kind, name)
+		else
+			buf_name = string.format("kube://%s/%s/logs", kind, name)
+		end
+
+		table.insert(params, "container=" .. resource.name)
+
+		if follow then
+			table.insert(params, "follow=true")
+		end
+
+		buf_name = buf_name .. "?" .. table.concat(params, "&")
+
+		vim.cmd.edit(buf_name)
+	end,
 }
 
 return M

@@ -25,7 +25,7 @@ function M.setup_buffer_keymaps(buf_nr)
 		if #marks > 0 then
 			local mark_id = marks[1][1]
 			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", vim.inspect(resource))
+			log.debug("resource under cursor", resource)
 
 			if resource.kind then
 				actions[resource.kind:lower()].drill_down_resource(resource)
@@ -50,12 +50,16 @@ function M.setup_buffer_keymaps(buf_nr)
 		if #marks > 0 then
 			local mark_id = marks[1][1]
 			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", vim.inspect(resource))
+			log.debug("resource under cursor", resource)
 
 			if resource.kind then
 				actions[resource.kind:lower()].show_logs(resource, false, nil)
 			elseif subresource_kind then
-				actions[subresource_kind:lower()].show_logs(resource, false, nil)
+				actions[subresource_kind:lower()].show_logs(resource, false, {
+					kind = kbuf.resource_kind,
+					name = kbuf.resource_name,
+					namespace = kbuf.namespace,
+				})
 			end
 		end
 	end, { buffer = buf })
@@ -76,7 +80,11 @@ function M.setup_buffer_keymaps(buf_nr)
 			if resource.kind then
 				actions[resource.kind:lower()].show_logs(resource, true, nil)
 			elseif subresource_kind then
-				actions[subresource_kind:lower()].show_logs(resource, true, nil)
+				actions[subresource_kind:lower()].show_logs(resource, true, {
+					kind = kbuf.resource_kind,
+					name = kbuf.resource_name,
+					namespace = kbuf.namespace,
+				})
 			end
 		end
 	end, { buffer = buf })
