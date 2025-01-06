@@ -4,6 +4,7 @@
 ---@field namespace string?
 ---@class Actions
 ---@field drill_down_resource fun(resource: table, parent: ParentResource|nil)
+---@field show_logs fun(resource: table, follow: boolean, parent: ParentResource|nil)|nil
 
 local actions = {
 	pod = require("kube.actions.pod"),

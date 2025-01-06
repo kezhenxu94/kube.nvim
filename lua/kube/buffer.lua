@@ -178,7 +178,12 @@ function M.align_row(row, col_widths)
 	local formatted_cols = {}
 	for i, col in ipairs(row) do
 		if i <= #col_widths then
-			table.insert(formatted_cols, string.format("%-" .. col_widths[i] .. "s", col or ""))
+			local width = math.min(99, col_widths[i])
+			local col_str = col or ""
+			if #col_str > width then
+				col_str = col_str:sub(1, width - 3) .. "..."
+			end
+			table.insert(formatted_cols, string.format("%-" .. width .. "s", col_str))
 		end
 	end
 	return table.concat(formatted_cols, "  ")

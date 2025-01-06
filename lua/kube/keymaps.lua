@@ -1,6 +1,7 @@
 local config = require("kube.config").values
 local constants = require("kube.constants")
 local log = require("kube.log")
+local actions = require("kube.actions")
 
 local M = {}
 
@@ -27,13 +28,55 @@ function M.setup_buffer_keymaps(buf_nr)
 			log.debug("resource under cursor", vim.inspect(resource))
 
 			if resource.kind then
-				require("kube.actions")[resource.kind:lower()].drill_down_resource(resource)
+				actions[resource.kind:lower()].drill_down_resource(resource)
 			elseif subresource_kind then
-				require("kube.actions")[subresource_kind:lower()].drill_down_resource(resource, {
+				actions[subresource_kind:lower()].drill_down_resource(resource, {
 					kind = kbuf.resource_kind,
 					name = kbuf.resource_name,
 					namespace = kbuf.namespace,
 				})
+			end
+		end
+	end, { buffer = buf })
+
+	vim.keymap.set("n", config.keymaps.show_logs, function()
+		local line = vim.api.nvim_win_get_cursor(0)[1]
+		if line == 1 then
+			return
+		end
+
+		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
+
+		if #marks > 0 then
+			local mark_id = marks[1][1]
+			local resource = mark_mappings[mark_id]
+			log.debug("resource under cursor", vim.inspect(resource))
+
+			if resource.kind then
+				actions[resource.kind:lower()].show_logs(resource, false, nil)
+			elseif subresource_kind then
+				actions[subresource_kind:lower()].show_logs(resource, false, nil)
+			end
+		end
+	end, { buffer = buf })
+
+	vim.keymap.set("n", config.keymaps.follow_logs, function()
+		local line = vim.api.nvim_win_get_cursor(0)[1]
+		if line == 1 then
+			return
+		end
+
+		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
+
+		if #marks > 0 then
+			local mark_id = marks[1][1]
+			local resource = mark_mappings[mark_id]
+			log.debug("resource under cursor", vim.inspect(resource))
+
+			if resource.kind then
+				actions[resource.kind:lower()].show_logs(resource, true, nil)
+			elseif subresource_kind then
+				actions[subresource_kind:lower()].show_logs(resource, true, nil)
 			end
 		end
 	end, { buffer = buf })

@@ -9,6 +9,8 @@ function M.defaults()
 		keymaps = {
 			drill_down = "gd",
 			refresh = "<c-r>",
+			show_logs = "gl",
+			follow_logs = "gL",
 		},
 	}
 end
