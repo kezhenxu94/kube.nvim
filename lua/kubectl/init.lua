@@ -27,18 +27,18 @@ end
 ---@param namespace string|nil The namespace of the resource, or nil to list all resources in all namespaces
 ---@param callback function Callback function to handle the output
 function M.get(resource_kind, name, namespace, callback)
-    log.debug("kubectl.get", resource_kind, name, namespace)
+	log.debug("kubectl.get", resource_kind, name, namespace)
 
 	local cmd = "get " .. resource_kind .. " -o json"
 	if name then
 		cmd = cmd .. " " .. name
 	end
 	if namespace then
-        if namespace:lower() == "all" then
-            cmd = cmd .. " --all-namespaces"
-        else
-            cmd = cmd .. " -n " .. namespace
-        end
+		if namespace:lower() == "all" then
+			cmd = cmd .. " --all-namespaces"
+		else
+			cmd = cmd .. " -n " .. namespace
+		end
 	end
 	return kubectl(cmd, callback)
 end
@@ -66,29 +66,29 @@ end
 ---@param namespace string The namespace of the resource
 ---@param callback function Callback function to handle the output
 function M.get_resource_yaml(kind, name, namespace, callback)
-    log.debug("kubectl.get_resource_yaml", kind, name, namespace)
+	log.debug("kubectl.get_resource_yaml", kind, name, namespace)
 
 	local cmd = string.format("get %s %s -n %s -o yaml", string.lower(kind), name, namespace or "default")
 	return kubectl(cmd, callback)
 end
 
----@param pod_name string The name of the pod
+---@param resource_name string|nil The name of the resource
 ---@param container_name string|nil The name of the container, or nil to get logs from the first container
----@param namespace string The namespace of the pod
+---@param namespace string The namespace of the resource
 ---@param follow boolean|nil Whether to follow the logs (tail -f style)
 ---@param callback function Callback function to handle the output
 ---@return Job|nil The job object, or nil if the job is not started
-function M.logs(pod_name, container_name, namespace, follow, callback)
-    log.debug("kubectl.logs", pod_name, container_name, namespace, follow)
+function M.logs(resource_name, container_name, namespace, follow, callback)
+	log.debug("kubectl.logs", resource_name, container_name, namespace, follow)
 
-    local cmd = "logs " .. pod_name
-    if container_name then
-        cmd = cmd .. " -c " .. container_name
-    end
-    if namespace then
-        cmd = cmd .. " -n " .. namespace
-    end
-	
+	local cmd = "logs " .. resource_name
+	if container_name then
+		cmd = cmd .. " -c " .. container_name
+	end
+	if namespace then
+		cmd = cmd .. " -n " .. namespace
+	end
+
 	if follow then
 		cmd = cmd .. " -f"
 		local job = Job:new({

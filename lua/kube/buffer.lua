@@ -128,6 +128,10 @@ function KubeBuffer:new(buf_nr)
 	}, KubeBuffer)
 	_G.kube_buffers[buf_nr] = this
 
+	self:setup()
+
+	require("kube.keymaps").setup_buffer_keymaps(buf_nr)
+
 	return this
 end
 

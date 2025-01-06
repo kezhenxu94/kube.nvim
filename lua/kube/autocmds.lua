@@ -9,30 +9,14 @@ local M = {}
 augroup("kube_autocmds", { clear = true })
 
 function M.setup()
-	autocmd("BufEnter", {
-		group = "kube_autocmds",
-		pattern = "kube://*",
-		callback = function(ev)
-			log.debug("entered buffer", ev.buf)
-
-			local buf = KubeBuffer:new(ev.buf)
-
-			require("kube.keymaps").setup_buffer_keymaps(ev.buf)
-		end,
-	})
-
-	autocmd("BufReadCmd", {
+	autocmd({ "BufReadCmd" }, {
 		group = "kube_autocmds",
 		pattern = "kube://*",
 		callback = function(ev)
 			local buf_name = vim.api.nvim_buf_get_name(ev.buf)
 			log.debug("loading buffer", buf_name)
 
-			local buf = KubeBuffer:new(ev.buf)
-			buf:setup()
-			buf:load()
-
-			require("kube.keymaps").setup_buffer_keymaps(ev.buf)
+			KubeBuffer:new(ev.buf):load()
 		end,
 	})
 
