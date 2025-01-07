@@ -20,7 +20,7 @@ function M.setup()
 		end,
 	})
 
-	autocmd("BufDelete", {
+	autocmd({ "BufDelete" }, {
 		group = "kube_autocmds",
 		pattern = "kube://*",
 		callback = function(ev)
@@ -31,7 +31,7 @@ function M.setup()
 			log.debug("shutting down jobs")
 
 			if buf then
-				for job_id, job in pairs(buf.jobs) do
+				for job_id, _ in pairs(buf.jobs) do
 					log.debug("shutting down job", job_id)
 					vim.loop.kill(job_id, vim.loop.constants.SIGTERM)
 					buf.jobs[job_id] = nil

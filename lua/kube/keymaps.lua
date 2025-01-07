@@ -89,6 +89,45 @@ function M.setup_buffer_keymaps(buf_nr)
 		end
 	end, { buffer = buf })
 
+	vim.keymap.set("n", config.keymaps.port_forward, function()
+		local line = vim.api.nvim_win_get_cursor(0)[1]
+		if line == 1 then
+			return
+		end
+
+		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
+
+		if #marks > 0 then
+			local mark_id = marks[1][1]
+			local resource = mark_mappings[mark_id]
+			log.debug("resource under cursor", resource)
+
+			if resource.kind then
+				actions[resource.kind:lower()].port_forward(resource, nil)
+			elseif subresource_kind then
+				actions[subresource_kind:lower()].port_forward(resource, {
+					kind = kbuf.resource_kind,
+					name = kbuf.resource_name,
+					namespace = kbuf.namespace,
+				})
+			end
+		end
+	end, { buffer = buf })
+
+	vim.keymap.set("n", config.keymaps.show_yaml, function()
+		local line = vim.api.nvim_win_get_cursor(0)[1]
+		if line == 1 then
+			return
+		end
+
+		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
+		local mark_id = marks[1][1]
+		local resource = mark_mappings[mark_id]
+		log.debug("resource under cursor", resource)
+
+		require("kube.actions.default").show_yaml(resource, nil)
+	end, { buffer = buf })
+
 	vim.keymap.set("n", config.keymaps.refresh, function()
 		local parts = {}
 		if namespace then

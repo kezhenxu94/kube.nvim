@@ -1,3 +1,10 @@
+---@class PortForward
+---@field local_port number The local port to forward to
+---@field pid number The pid of the port forward
+
+---@type table<string, table<number, PortForward>> -- namespace/pod -> container port -> PortForward
+_G.portforwards = {}
+
 local M = {}
 
 ---@param opts table|nil

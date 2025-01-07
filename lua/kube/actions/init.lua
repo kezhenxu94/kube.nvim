@@ -3,8 +3,11 @@
 ---@field name string?
 ---@field namespace string?
 ---@class Actions
----@field drill_down_resource fun(resource: table, parent: ParentResource|nil)
----@field show_logs fun(resource: table, follow: boolean, parent: ParentResource|nil)|nil
+---@field drill_down_resource fun(resource: table, parent: ParentResource|nil) -- Drill down into the resource
+---@field show_yaml fun(resource: table, parent: ParentResource|nil)|nil -- Show the yaml buffer for the resource
+---@field show_logs fun(resource: table, follow: boolean, parent: ParentResource|nil)|nil -- Show the logs buffer for the resource
+---@field show_events fun(resource: table, parent: ParentResource|nil)|nil -- Show the events buffer for the resource
+---@field port_forward fun(resource: table, parent: ParentResource|nil)|nil -- Show the port forward buffer for the resource
 
 local actions = {
 	pod = require("kube.actions.pod"),

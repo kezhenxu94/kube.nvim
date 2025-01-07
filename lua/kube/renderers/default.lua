@@ -51,8 +51,6 @@ function M.load(buffer)
 					self.mark_mappings[mark_id] = row.raw
 				end
 			end
-
-			vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
 		end)
 	end)
 

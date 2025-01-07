@@ -11,6 +11,8 @@ function M.defaults()
 			refresh = "<c-r>",
 			show_logs = "gl",
 			follow_logs = "gL",
+			port_forward = "gf",
+			show_yaml = "gy",
 		},
 	}
 end

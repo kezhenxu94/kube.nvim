@@ -16,6 +16,7 @@ local formatters = {
 	configmaps = require("kube.formatters.configmaps"),
 	secrets = require("kube.formatters.secrets"),
 	containers = require("kube.formatters.containers"),
+	portforward = require("kube.formatters.portforward"),
 }
 
 ---@type table<string, Formatter>
