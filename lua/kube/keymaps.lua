@@ -14,116 +14,114 @@ function M.setup_buffer_keymaps(buf_nr)
 	local subresource_kind = kbuf.subresource_kind
 	log.debug("resource_kind", resource_kind, "namespace", namespace, "subresource_kind", subresource_kind)
 
-	vim.keymap.set("n", config.keymaps.drill_down, function()
+	---@type fun(): table<string, any>|nil
+	local resource_under_cursor = function()
 		local line = vim.api.nvim_win_get_cursor(0)[1]
 		if line == 1 then
-			return
+			return nil
 		end
 
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
-
+		local marks = vim.api.nvim_buf_get_extmarks(buf_nr, constants.KUBE_NAMESPACE, line, line, { details = true })
 		if #marks > 0 then
 			local mark_id = marks[1][1]
 			local resource = mark_mappings[mark_id]
 			log.debug("resource under cursor", resource)
+			return resource
+		end
 
-			if resource.kind then
-				actions[resource.kind:lower()].drill_down_resource(resource)
-			elseif subresource_kind then
-				actions[subresource_kind:lower()].drill_down_resource(resource, {
-					kind = kbuf.resource_kind,
-					name = kbuf.resource_name,
-					namespace = kbuf.namespace,
-				})
-			end
+		return nil
+	end
+
+	vim.keymap.set("n", config.keymaps.drill_down, function()
+		local resource = resource_under_cursor()
+		if not resource then
+			return
+		end
+
+		if resource.kind then
+			actions[resource.kind:lower()].drill_down_resource(resource)
+		elseif subresource_kind then
+			actions[subresource_kind:lower()].drill_down_resource(resource, {
+				kind = kbuf.resource_kind,
+				name = kbuf.resource_name,
+				namespace = kbuf.namespace,
+			})
 		end
 	end, { buffer = buf })
 
 	vim.keymap.set("n", config.keymaps.show_logs, function()
-		local line = vim.api.nvim_win_get_cursor(0)[1]
-		if line == 1 then
+		local resource = resource_under_cursor()
+		if not resource then
 			return
 		end
 
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
-
-		if #marks > 0 then
-			local mark_id = marks[1][1]
-			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", resource)
-
-			if resource.kind then
-				actions[resource.kind:lower()].show_logs(resource, false, nil)
-			elseif subresource_kind then
-				actions[subresource_kind:lower()].show_logs(resource, false, {
-					kind = kbuf.resource_kind,
-					name = kbuf.resource_name,
-					namespace = kbuf.namespace,
-				})
-			end
+		if resource.kind then
+			actions[resource.kind:lower()].show_logs(resource, false, nil)
+		elseif subresource_kind then
+			actions[subresource_kind:lower()].show_logs(resource, false, {
+				kind = kbuf.resource_kind,
+				name = kbuf.resource_name,
+				namespace = kbuf.namespace,
+			})
 		end
 	end, { buffer = buf })
 
 	vim.keymap.set("n", config.keymaps.follow_logs, function()
-		local line = vim.api.nvim_win_get_cursor(0)[1]
-		if line == 1 then
+		local resource = resource_under_cursor()
+		if not resource then
 			return
 		end
 
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
-
-		if #marks > 0 then
-			local mark_id = marks[1][1]
-			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", vim.inspect(resource))
-
-			if resource.kind then
-				actions[resource.kind:lower()].show_logs(resource, true, nil)
-			elseif subresource_kind then
-				actions[subresource_kind:lower()].show_logs(resource, true, {
-					kind = kbuf.resource_kind,
-					name = kbuf.resource_name,
-					namespace = kbuf.namespace,
-				})
-			end
+		if resource.kind then
+			actions[resource.kind:lower()].show_logs(resource, true, nil)
+		elseif subresource_kind then
+			actions[subresource_kind:lower()].show_logs(resource, true, {
+				kind = kbuf.resource_kind,
+				name = kbuf.resource_name,
+				namespace = kbuf.namespace,
+			})
 		end
 	end, { buffer = buf })
 
 	vim.keymap.set("n", config.keymaps.port_forward, function()
-		local line = vim.api.nvim_win_get_cursor(0)[1]
-		if line == 1 then
+		local resource = resource_under_cursor()
+		if not resource then
 			return
 		end
 
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
+		if resource.kind then
+			actions[resource.kind:lower()].port_forward(resource, nil)
+		elseif subresource_kind then
+			actions[subresource_kind:lower()].port_forward(resource, {
+				kind = kbuf.resource_kind,
+				name = kbuf.resource_name,
+				namespace = kbuf.namespace,
+			})
+		end
+	end, { buffer = buf })
 
-		if #marks > 0 then
-			local mark_id = marks[1][1]
-			local resource = mark_mappings[mark_id]
-			log.debug("resource under cursor", resource)
+	vim.keymap.set("n", config.keymaps.forward_port, function()
+		local resource = resource_under_cursor()
+		if not resource then
+			return
+		end
 
-			if resource.kind then
-				actions[resource.kind:lower()].port_forward(resource, nil)
-			elseif subresource_kind then
-				actions[subresource_kind:lower()].port_forward(resource, {
-					kind = kbuf.resource_kind,
-					name = kbuf.resource_name,
-					namespace = kbuf.namespace,
-				})
-			end
+		if resource.kind then
+			actions[resource.kind:lower()].forward_port(resource, nil)
+		elseif subresource_kind then
+			actions[subresource_kind:lower()].forward_port(resource, {
+				kind = kbuf.resource_kind,
+				name = kbuf.resource_name,
+				namespace = kbuf.namespace,
+			})
 		end
 	end, { buffer = buf })
 
 	vim.keymap.set("n", config.keymaps.show_yaml, function()
-		local line = vim.api.nvim_win_get_cursor(0)[1]
-		if line == 1 then
+		local resource = resource_under_cursor()
+		if not resource then
 			return
 		end
-
-		local marks = vim.api.nvim_buf_get_extmarks(buf, constants.KUBE_NAMESPACE, line, line, { details = true })
-		local mark_id = marks[1][1]
-		local resource = mark_mappings[mark_id]
-		log.debug("resource under cursor", resource)
 
 		require("kube.actions.default").show_yaml(resource, nil)
 	end, { buffer = buf })

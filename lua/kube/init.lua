@@ -1,8 +1,8 @@
 ---@class PortForward
----@field local_port number The local port to forward to
+---@field container_port number The container port to forward
 ---@field pid number The pid of the port forward
 
----@type table<string, table<number, PortForward>> -- namespace/pod -> container port -> PortForward
+---@type table<string, table<number, PortForward>> -- namespace/pod -> local port -> PortForward
 _G.portforwards = {}
 
 local M = {}
@@ -21,6 +21,12 @@ function M.setup(opts)
 				for pid, _ in pairs(buffer.jobs) do
 					vim.loop.kill(pid, vim.loop.constants.SIGTERM)
 					buffer.jobs[pid] = nil
+				end
+			end
+
+			for _, portforwards in pairs(_G.portforwards) do
+				for _, portforward in pairs(portforwards) do
+					vim.loop.kill(portforward.pid, vim.loop.constants.SIGTERM)
 				end
 			end
 		end,

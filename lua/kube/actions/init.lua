@@ -8,6 +8,7 @@
 ---@field show_logs fun(resource: table, follow: boolean, parent: ParentResource|nil)|nil -- Show the logs buffer for the resource
 ---@field show_events fun(resource: table, parent: ParentResource|nil)|nil -- Show the events buffer for the resource
 ---@field port_forward fun(resource: table, parent: ParentResource|nil)|nil -- Show the port forward buffer for the resource
+---@field forward_port fun(resource: table, parent: ParentResource|nil)|nil -- Forward the port for the resource
 
 local actions = {
 	pod = require("kube.actions.pod"),

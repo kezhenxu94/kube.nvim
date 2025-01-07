@@ -16,15 +16,11 @@ local M = {
 			local urls = {}
 			for _, port in ipairs(container.ports or {}) do
 				local container_port = port.containerPort
-				local portforward = portforwards[container_port]
-
-				if portforward then
-					table.insert(ports, string.format("%d:%d", portforward.local_port, container_port))
-					table.insert(urls, string.format("http://localhost:%d", portforward.local_port))
-				else
-					log.debug("portforward not found", namespace, name, container_port)
-					table.insert(ports, "")
-					table.insert(urls, "")
+				for local_port, portforward in pairs(portforwards) do
+					if portforward.container_port == container_port then
+						table.insert(ports, string.format("%d:%d", local_port, container_port))
+						table.insert(urls, string.format("http://localhost:%d", local_port))
+					end
 				end
 			end
 
@@ -32,8 +28,8 @@ local M = {
 				row = {
 					name,
 					container.name,
-					table.concat(ports, ", "),
-					table.concat(urls, ", "),
+					table.concat(ports, ","),
+					table.concat(urls, ","),
 				},
 				item = parent_resource,
 			})

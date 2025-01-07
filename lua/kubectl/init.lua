@@ -4,17 +4,31 @@ local log = require("kube.log")
 local M = {}
 
 ---@param cmd string The command to execute
----@param callback function Callback function to handle the output
-local function kubectl(cmd, callback)
+---@param callback fun(data: string|nil)|nil Callback function to handle the output
+---@param on_error fun(data: string|nil)|nil Callback function to handle the erroroutput
+local function kubectl(cmd, callback, on_error)
 	local job = Job:new({
 		command = "kubectl",
 		args = vim.split(cmd, " "),
 		on_exit = function(j, return_val)
+			if not callback then
+				return
+			end
+
 			local result = table.concat(j:result(), "\n")
 			if return_val == 0 then
 				callback(result)
 			else
 				callback(nil)
+			end
+		end,
+		on_stderr = function(_, data)
+			if not on_error then
+				return
+			end
+
+			if data then
+				on_error(data)
 			end
 		end,
 	})
@@ -125,6 +139,20 @@ function M.logs(resource_name, container_name, namespace, follow, callback)
 		job:start()
 		return job
 	end
+end
+
+---@param resource_kind string The kind of resource
+---@param name string The name of the resource
+---@param namespace string The namespace of the resource
+---@param container string The name of the container
+---@param port number The port to forward
+---@param local_port number The local port to forward to
+---@param on_error fun(data: string|nil) Callback function to handle the output
+function M.forward_port(resource_kind, name, namespace, container, port, local_port, callback, on_error)
+	log.debug("kubectl.forward_port", resource_kind, name, namespace, container, port, local_port)
+
+	local cmd = string.format("port-forward %s/%s -n %s %d:%d", resource_kind, name, namespace, local_port, port)
+	return kubectl(cmd, callback, on_error)
 end
 
 return M
