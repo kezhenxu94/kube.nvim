@@ -12,8 +12,6 @@ local M = {
 		vim.api.nvim_buf_set_name(buf_nr, buf_name)
 
 		vim.api.nvim_set_option_value("modifiable", true, { buf = buf_nr })
-		vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf_nr })
-		vim.api.nvim_set_option_value("swapfile", false, { buf = buf_nr })
 		vim.api.nvim_set_option_value("filetype", "yaml", { buf = buf_nr })
 
 		vim.api.nvim_set_current_buf(buf_nr)

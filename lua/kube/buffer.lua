@@ -136,10 +136,8 @@ function KubeBuffer:new(buf_nr)
 end
 
 function KubeBuffer:setup()
-	vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
 	vim.api.nvim_set_option_value("buftype", "nofile", { buf = self.buf_nr })
 	vim.api.nvim_set_option_value("swapfile", false, { buf = self.buf_nr })
-	vim.api.nvim_set_option_value("filetype", "kube", { buf = self.buf_nr })
 
 	for group, colors in pairs(highlights) do
 		vim.api.nvim_set_hl(0, group, colors)
