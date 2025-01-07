@@ -11,8 +11,8 @@ function M.setup(opts)
 	vim.api.nvim_create_autocmd("VimLeavePre", {
 		callback = function()
 			for _, buffer in pairs(_G.kube_buffers or {}) do
-				for pid, job in pairs(buffer.jobs) do
-					job:shutdown()
+				for pid, _ in pairs(buffer.jobs) do
+					vim.loop.kill(pid, vim.loop.constants.SIGTERM)
 					buffer.jobs[pid] = nil
 				end
 			end
@@ -22,14 +22,14 @@ function M.setup(opts)
 end
 
 function M.show_resources(resource_kind, namespace)
-    local buf_name
-    if not namespace or namespace:lower() == "all" then
-        buf_name = string.format("kube://%s", resource_kind)
-    else
-        buf_name = string.format("kube://namespaces/%s/%s", namespace, resource_kind)
-    end
+	local buf_name
+	if not namespace or namespace:lower() == "all" then
+		buf_name = string.format("kube://%s", resource_kind)
+	else
+		buf_name = string.format("kube://namespaces/%s/%s", namespace, resource_kind)
+	end
 
-    vim.cmd.edit(buf_name)
+	vim.cmd.edit(buf_name)
 end
 
 return M

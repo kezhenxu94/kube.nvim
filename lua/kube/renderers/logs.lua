@@ -1,5 +1,6 @@
 local kubectl = require("kubectl")
 local log = require("kube.log")
+local augroup = require("kube.autocmds").augroup
 
 local M = {}
 
@@ -36,27 +37,12 @@ function M.load(buffer)
 
 	if job then
 		self.jobs[job.pid] = job
-
-		local group = vim.api.nvim_create_augroup("kube_autocmds", { clear = true })
-		vim.api.nvim_create_autocmd("BufLeave", {
-			group = group,
-			buffer = self.buf_nr,
-			callback = function()
-				if self.jobs[job.pid] then
-					job:shutdown()
-					self.jobs[job.pid] = nil
-
-					vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
-					vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "Stopped kubectl logs job" })
-					vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
-				end
-			end,
-			desc = "Stop kubectl logs job when buffer is hidden",
-		})
+		log.debug("job", job.pid, "started")
 
 		vim.keymap.set("n", "<C-c>", function()
 			if self.jobs[job.pid] then
-				job:shutdown()
+				log.debug("killing job", job.pid)
+				vim.loop.kill(job.pid, vim.loop.constants.SIGTERM)
 				self.jobs[job.pid] = nil
 
 				vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })

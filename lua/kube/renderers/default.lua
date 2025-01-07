@@ -115,4 +115,3 @@ function M.align_row(row, col_widths)
 end
 
 return M
-
