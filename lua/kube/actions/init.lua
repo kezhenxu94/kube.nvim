@@ -11,16 +11,16 @@
 ---@field forward_port fun(resource: table, parent: ParentResource|nil)|nil -- Forward the port for the resource
 
 local actions = {
-	pod = require("kube.actions.pod"),
-	container = require("kube.actions.container"),
-	containers = require("kube.actions.container"),
+  pod = require("kube.actions.pod"),
+  container = require("kube.actions.container"),
+  containers = require("kube.actions.container"),
 }
 
 ---@type table<string, Actions>
 local M = {}
 
 return setmetatable(M, {
-	__index = function(_, key)
-		return actions[key] or require("kube.actions.default")
-	end,
+  __index = function(_, key)
+    return actions[key] or require("kube.actions.default")
+  end,
 })
