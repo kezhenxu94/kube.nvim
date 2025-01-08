@@ -2,15 +2,6 @@ local log = require("kube.log")
 
 local M = {}
 
-local highlights = {
-  KubePending = { fg = "#fe640b" },
-  KubeRunning = { fg = "#40a02b" },
-  KubeFailed = { fg = "#d20f39" },
-  KubeSucceeded = { fg = "#9ca0b0" },
-  KubeUnknown = { fg = "#6c6f85" },
-  KubeHeader = { fg = "#df8e1d", bold = true, underline = true },
-}
-
 ---@type table<number, KubeBuffer>
 _G.kube_buffers = {}
 
@@ -138,10 +129,6 @@ end
 function KubeBuffer:setup()
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = self.buf_nr })
   vim.api.nvim_set_option_value("swapfile", false, { buf = self.buf_nr })
-
-  for group, colors in pairs(highlights) do
-    vim.api.nvim_set_hl(0, group, colors)
-  end
 end
 
 function KubeBuffer:load()
