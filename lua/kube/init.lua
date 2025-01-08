@@ -6,6 +6,7 @@
 _G.portforwards = {}
 
 local highlights = {
+  KubeBody = { fg = "#40a02b" },
   KubePending = { fg = "#fe640b" },
   KubeRunning = { fg = "#40a02b" },
   KubeFailed = { fg = "#d20f39" },
@@ -48,7 +49,9 @@ function M.setup(opts)
   })
 end
 
-function M.show_resources(resource_kind, namespace)
+---@param resource_kind string The resource kind to get
+---@param namespace string|nil The namespace to get the resource from, defaults to nil, which means the default namespace, use "all" to get from all namespaces
+function M.get(resource_kind, namespace)
   local buf_name
   if not namespace or namespace:lower() == "all" then
     buf_name = string.format("kube://%s", resource_kind)

@@ -42,9 +42,7 @@ function M.load(buffer)
       vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
 
       for row_num, row in ipairs(formatted_rows) do
-        if row.highlight then
-          vim.api.nvim_buf_add_highlight(self.buf_nr, -1, row.highlight, row_num - 1, 0, -1)
-        end
+        vim.api.nvim_buf_add_highlight(self.buf_nr, -1, row.highlight or "KubeBody", row_num - 1, 0, -1)
         if row_num > 0 and row.raw then
           local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {})
           self.mark_mappings[mark_id] = row.raw
