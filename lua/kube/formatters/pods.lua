@@ -23,7 +23,7 @@ local M = {
       end
       local ready = string.format("%d/%d", ready_count, container_count)
 
-      if ready_count < container_count then
+      if status == "Running" and ready_count < container_count then
         highlight = "KubePending"
       end
 
