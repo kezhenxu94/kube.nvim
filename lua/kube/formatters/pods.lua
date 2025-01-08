@@ -10,6 +10,7 @@ local M = {
       local name = pod.metadata.name
       local namespace = pod.metadata.namespace
       local status = pod.status.phase
+      local highlight = "Kube" .. status
 
       local ready_count = 0
       local container_count = #pod.spec.containers
@@ -21,6 +22,10 @@ local M = {
         end
       end
       local ready = string.format("%d/%d", ready_count, container_count)
+
+      if ready_count < container_count then
+        highlight = "KubePending"
+      end
 
       local restarts = 0
       if pod.status.containerStatuses then
@@ -39,7 +44,7 @@ local M = {
           pod.status.podIP or "",
           pod.spec.nodeName or "",
           utils.calculate_age(pod.metadata.creationTimestamp),
-          highlight = "Kube" .. status,
+          highlight = highlight,
         },
         item = pod,
       })
