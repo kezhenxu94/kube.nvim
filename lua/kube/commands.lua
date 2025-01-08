@@ -25,7 +25,23 @@ function M.setup()
         return commands
       end
 
-      return {}
+      local command = args[2]
+      local command_fn = M.commands[command]
+      if not command_fn then return {} end
+
+      local params = {}
+      local info = debug.getinfo(command_fn, "u")
+      for i = 1, info.nparams do
+        local param_name = debug.getlocal(command_fn, i)
+        table.insert(params, param_name)
+      end
+
+      if arglead and arglead ~= "" then
+        return vim.tbl_filter(function(param)
+          return vim.startswith(param, arglead)
+        end, params)
+      end
+      return params
     end,
   })
 end
