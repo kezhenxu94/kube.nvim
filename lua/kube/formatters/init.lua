@@ -7,16 +7,46 @@
 ---@field item table The original resource item data
 
 local formatters = {
-  pods = require("kube.formatters.pods"),
-  deployments = require("kube.formatters.deployments"),
-  nodes = require("kube.formatters.nodes"),
-  namespaces = require("kube.formatters.namespaces"),
-  services = require("kube.formatters.services"),
-  ingresses = require("kube.formatters.ingresses"),
-  configmaps = require("kube.formatters.configmaps"),
-  secrets = require("kube.formatters.secrets"),
-  containers = require("kube.formatters.containers"),
-  portforward = require("kube.formatters.portforward"),
+  {
+    { "pods", "po" },
+    require("kube.formatters.pods"),
+  },
+  {
+    { "deployments", "deploy" },
+    require("kube.formatters.deployments"),
+  },
+  {
+    { "nodes", "no" },
+    require("kube.formatters.nodes"),
+  },
+  {
+    { "namespaces", "ns" },
+    require("kube.formatters.namespaces"),
+  },
+  {
+    { "services", "svc" },
+    require("kube.formatters.services"),
+  },
+  {
+    { "ingresses", "ing" },
+    require("kube.formatters.ingresses"),
+  },
+  {
+    { "configmaps", "cm" },
+    require("kube.formatters.configmaps"),
+  },
+  {
+    { "secrets" },
+    require("kube.formatters.secrets"),
+  },
+  {
+    { "containers" },
+    require("kube.formatters.containers"),
+  },
+  {
+    { "portforward" },
+    require("kube.formatters.portforward"),
+  },
 }
 
 ---@type table<string, Formatter>
@@ -24,6 +54,13 @@ local M = {}
 
 return setmetatable(M, {
   __index = function(_, key)
-    return formatters[key] or require("kube.formatters.default")
+    for _, formatter in ipairs(formatters) do
+      for _, resource in ipairs(formatter[1]) do
+        if resource == key then
+          return formatter[2]
+        end
+      end
+    end
+    return require("kube.formatters.default")
   end,
 })

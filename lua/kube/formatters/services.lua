@@ -2,7 +2,7 @@ local utils = require("kube.utils")
 
 ---@type Formatter
 local M = {
-  headers = { "NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE" },
+  headers = { "NAMESPACE", "NAME", "TYPE", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE" },
 
   format = function(data)
     local rows = {}
@@ -14,6 +14,7 @@ local M = {
 
       table.insert(rows, {
         row = {
+          item.metadata.namespace,
           item.metadata.name,
           item.spec.type or "ClusterIP",
           item.spec.clusterIP or "<none>",

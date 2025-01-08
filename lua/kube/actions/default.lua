@@ -5,7 +5,12 @@ local show_yaml = function(resource)
   local name = resource.metadata.name
   local namespace = resource.metadata.namespace
 
-  local buf_name = string.format("kube://%s/%s/%s.yaml", namespace, string.lower(kind), name)
+  local buf_name
+  if namespace then
+    buf_name = string.format("kube://namespaces/%s/%s/%s.yaml", namespace, kind:lower(), name)
+  else
+    buf_name = string.format("kube://%s/%s.yaml", string.lower(kind), name)
+  end
   local buf_nr = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(buf_nr, buf_name)
 
