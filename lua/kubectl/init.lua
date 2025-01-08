@@ -155,4 +155,15 @@ function M.forward_port(resource_kind, name, namespace, container, port, local_p
   return kubectl(cmd, callback, on_error)
 end
 
+---@param resource_kind string The kind of resource
+---@param name string The name of the resource
+---@param namespace string The namespace of the resource
+---@param callback function Callback function to handle the output
+function M.describe(resource_kind, name, namespace, callback)
+  log.debug("kubectl.describe", resource_kind, name, namespace)
+
+  local cmd = string.format("describe %s %s -n %s", resource_kind, name, namespace)
+  return kubectl(cmd, callback)
+end
+
 return M

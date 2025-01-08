@@ -2,7 +2,7 @@ local utils = require("kube.utils")
 
 ---@type Formatter
 local M = {
-  headers = { "NAME", "TYPE", "DATA", "AGE" },
+  headers = { "NAMESPACE", "NAME", "TYPE", "DATA", "AGE" },
 
   format = function(data)
     local rows = {}
@@ -16,6 +16,7 @@ local M = {
 
       table.insert(rows, {
         row = {
+          item.metadata.namespace,
           item.metadata.name,
           item.type or "Opaque",
           tostring(data_count),

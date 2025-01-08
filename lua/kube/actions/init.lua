@@ -9,6 +9,7 @@
 ---@field show_events fun(resource: table, parent: ParentResource|nil)|nil -- Show the events buffer for the resource
 ---@field port_forward fun(resource: table, parent: ParentResource|nil)|nil -- Show the port forward buffer for the resource
 ---@field forward_port fun(resource: table, parent: ParentResource|nil)|nil -- Forward the port for the resource
+---@field describe fun(resource: table, parent: ParentResource|nil)|nil -- Describe the resource
 
 local actions = {
   pod = require("kube.actions.pod"),
@@ -21,6 +22,18 @@ local M = {}
 
 return setmetatable(M, {
   __index = function(_, key)
-    return actions[key] or require("kube.actions.default")
+    local default_actions = require("kube.actions.default")
+    local resource_actions = actions[key] or default_actions
+
+    return setmetatable({}, {
+      __index = function(_, action_name)
+        local action = resource_actions[action_name]
+        if action then
+          return action
+        end
+
+        return default_actions[action_name]
+      end,
+    })
   end,
 })

@@ -126,6 +126,15 @@ function M.setup_buffer_keymaps(buf_nr)
     require("kube.actions.default").show_yaml(resource, nil)
   end, { buffer = buf })
 
+  vim.keymap.set("n", config.keymaps.describe, function()
+    local resource = resource_under_cursor()
+    if not resource then
+      return
+    end
+
+    actions[resource.kind:lower()].describe(resource, nil)
+  end, { buffer = buf })
+
   vim.keymap.set("n", config.keymaps.refresh, function()
     local parts = {}
     if namespace then

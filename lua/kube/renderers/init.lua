@@ -3,6 +3,8 @@
 
 local renderers = {
   logs = require("kube.renderers.logs"),
+  describe = require("kube.renderers.describe"),
+  default = require("kube.renderers.default"),
 }
 
 ---@type Renderer
@@ -15,15 +17,22 @@ function M.load(buffer)
   local subresource_kind = self.subresource_kind
   local namespace = self.namespace
 
-  local renderer = require("kube.renderers.default")
-  if resource_kind and renderers[resource_kind] then
-    renderer = renderers[resource_kind]
-  end
   if subresource_kind and renderers[subresource_kind] then
-    renderer = renderers[subresource_kind]
+    renderers[subresource_kind].load(buffer)
+    return
   end
 
-  renderer.load(buffer)
+  if resource_kind and resource_name and not subresource_kind then
+    renderers.describe.load(buffer)
+    return
+  end
+
+  if resource_kind and renderers[resource_kind] then
+    renderers[resource_kind].load(buffer)
+    return
+  end
+
+  renderers.default.load(buffer)
 end
 
 return M

@@ -3,8 +3,8 @@ local utils = require("kube.utils")
 ---@type Formatter
 local M = {
   headers = {
-    "NAME",
     "NAMESPACE",
+    "NAME",
     "AGE",
   },
 

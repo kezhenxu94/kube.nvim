@@ -14,6 +14,7 @@ function M.defaults()
       port_forward = "gF",
       forward_port = "gf",
       show_yaml = "gy",
+      describe = "gD",
     },
   }
 end

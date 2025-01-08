@@ -42,6 +42,21 @@ local M = {
   drill_down_resource = show_yaml,
   show_yaml = show_yaml,
 
+  describe = function(resource, parent)
+    local kind = resource.kind
+    local name = resource.metadata.name
+    local namespace = resource.metadata.namespace
+
+    local buf_name
+    if namespace then
+      buf_name = string.format("kube://namespaces/%s/%s/%s", namespace, kind:lower(), name)
+    else
+      buf_name = string.format("kube://%s/%s", string.lower(kind), name)
+    end
+
+    vim.cmd.edit(buf_name)
+  end,
+
   ---@diagnostic disable-next-line: unused-local
   show_logs = function(resource, follow, parent)
     local kind = resource.kind
