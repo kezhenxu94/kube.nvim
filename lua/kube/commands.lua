@@ -15,8 +15,14 @@ function M.setup()
     complete = function(arglead, cmdline)
       local args = vim.split(cmdline, " ", { trimempty = true })
 
-      if #args == 1 then
-        return vim.tbl_keys(M.commands)
+      if #args <= 2 then
+        local commands = vim.tbl_keys(M.commands)
+        if arglead and arglead ~= "" then
+          return vim.tbl_filter(function(cmd)
+            return vim.startswith(cmd, arglead)
+          end, commands)
+        end
+        return commands
       end
 
       return {}
