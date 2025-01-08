@@ -166,4 +166,17 @@ function M.describe(resource_kind, name, namespace, callback)
   return kubectl(cmd, callback)
 end
 
+---@param resource_kind string The kind of resource
+---@param name string The name of the resource
+---@param namespace string|nil The namespace of the resource, or nil to delete from default namespace
+---@param callback function Callback function to handle the output
+---@param on_error fun(data: string|nil) Callback function to handle the error output
+---@return Job|nil The job object, or nil if the job is not started
+function M.delete(resource_kind, name, namespace, callback, on_error)
+  log.debug("kubectl.delete", resource_kind, name, namespace)
+
+  local cmd = string.format("delete %s %s -n %s", resource_kind, name, namespace or "default")
+  return kubectl(cmd, callback, on_error)
+end
+
 return M

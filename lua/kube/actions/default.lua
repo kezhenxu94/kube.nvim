@@ -57,6 +57,14 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
+  delete = function(resource, parent)
+    local kind = resource.kind
+    local name = resource.metadata.name
+    local namespace = resource.metadata.namespace
+
+    require("kubectl").delete(kind, name, namespace)
+  end,
+
   ---@diagnostic disable-next-line: unused-local
   show_logs = function(resource, follow, parent)
     local kind = resource.kind

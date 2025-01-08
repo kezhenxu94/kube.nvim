@@ -24,6 +24,7 @@ function M.load(buffer)
       vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
       vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, vim.split(result, "\n"))
       vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
+      vim.api.nvim_buf_set_option(self.buf_nr, "modified", false)
     end)
   end)
 end

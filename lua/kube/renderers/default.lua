@@ -23,12 +23,16 @@ function M.load(buffer)
   local kubectl = require("kubectl")
   local job = kubectl.get(resource_kind, resource_name, namespace, function(result)
     vim.schedule(function()
+      vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
+
       if not result then
         log.debug("empty result", namespace, resource_kind, resource_name)
         return
       end
 
       local data = vim.fn.json_decode(result)
+      buffer.data = data
+
       local rows = formatter.format(data)
 
       self:setup()
@@ -44,10 +48,15 @@ function M.load(buffer)
       for row_num, row in ipairs(formatted_rows) do
         vim.api.nvim_buf_add_highlight(self.buf_nr, -1, row.highlight or "KubeBody", row_num - 1, 0, -1)
         if row_num > 0 and row.raw then
-          local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {})
-          self.mark_mappings[mark_id] = row.raw
+          local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+            invalidate = true,
+          })
+          self.mark_mappings[mark_id] = {
+            item = row.raw,
+          }
         end
       end
+      vim.api.nvim_buf_set_option(buffer.buf_nr, "modified", false)
     end)
   end)
 

@@ -10,6 +10,7 @@
 ---@field port_forward fun(resource: table, parent: ParentResource|nil)|nil -- Show the port forward buffer for the resource
 ---@field forward_port fun(resource: table, parent: ParentResource|nil)|nil -- Forward the port for the resource
 ---@field describe fun(resource: table, parent: ParentResource|nil)|nil -- Describe the resource
+---@field delete fun(resource: table, parent: ParentResource|nil)|nil -- Delete the resource
 
 local actions = {
   pod = require("kube.actions.pod"),

@@ -32,6 +32,7 @@ function M.load(buffer)
       local start = vim.api.nvim_buf_line_count(self.buf_nr)
       vim.api.nvim_buf_set_lines(self.buf_nr, start, -1, false, lines)
       vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
+      vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
     end)
   end)
 
@@ -48,6 +49,7 @@ function M.load(buffer)
         vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
         vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "Stopped kubectl logs job" })
         vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
+        vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
       end
     end, { buffer = self.buf_nr, desc = "Stop kubectl logs job" })
   end

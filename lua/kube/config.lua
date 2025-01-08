@@ -8,7 +8,7 @@ function M.defaults()
   return {
     keymaps = {
       drill_down = "gd",
-      refresh = "<c-r>",
+      refresh = "gr",
       show_logs = "gl",
       follow_logs = "gL",
       port_forward = "gF",
