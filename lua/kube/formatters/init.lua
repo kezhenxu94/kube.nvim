@@ -8,35 +8,35 @@
 
 local formatters = {
   {
-    { "pods", "po" },
+    { "pods", "pod", "po" },
     require("kube.formatters.pods"),
   },
   {
-    { "deployments", "deploy" },
+    { "deployments", "deployment", "deploy" },
     require("kube.formatters.deployments"),
   },
   {
-    { "nodes", "no" },
+    { "nodes", "node", "no" },
     require("kube.formatters.nodes"),
   },
   {
-    { "namespaces", "ns" },
+    { "namespaces", "namespace", "ns" },
     require("kube.formatters.namespaces"),
   },
   {
-    { "services", "svc" },
+    { "services", "service", "svc" },
     require("kube.formatters.services"),
   },
   {
-    { "ingresses", "ing" },
+    { "ingresses", "ingress", "ing" },
     require("kube.formatters.ingresses"),
   },
   {
-    { "configmaps", "cm" },
+    { "configmaps", "configmap", "cm" },
     require("kube.formatters.configmaps"),
   },
   {
-    { "secrets" },
+    { "secrets", "secret" },
     require("kube.formatters.secrets"),
   },
   {
