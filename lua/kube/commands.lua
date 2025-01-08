@@ -34,6 +34,10 @@ M.commands = {
   get = function(resource_kind, namespace)
     require("kube").get(resource_kind, namespace)
   end,
+
+  delete = function(resource_kind, resource_name, namespace)
+    require("kube").delete(resource_kind, resource_name, namespace)
+  end,
 }
 
 return M

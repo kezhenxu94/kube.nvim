@@ -62,4 +62,23 @@ function M.get(resource_kind, namespace)
   vim.cmd.edit(buf_name)
 end
 
+function M.delete(resource_kind, resource_name, namespace)
+  vim.ui.select({ "Yes", "No" }, {
+    prompt = string.format("Delete %s: %s/%s?", resource_kind, namespace, resource_name),
+  }, function(choice)
+    if choice == "Yes" then
+      require("kubectl").delete(resource_kind, resource_name, namespace, function(result)
+        if result then
+          vim.notify(string.format("Deleted %s: %s/%s", resource_kind, namespace, resource_name))
+        end
+      end, function(data)
+        vim.notify(
+          string.format("Failed to delete %s: %s/%s: \n%s", resource_kind, namespace, resource_name, data),
+          vim.log.levels.ERROR
+        )
+      end)
+    end
+  end)
+end
+
 return M

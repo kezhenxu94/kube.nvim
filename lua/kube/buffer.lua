@@ -256,7 +256,7 @@ function KubeBuffer:delete_resource(resource, callback)
     vim.schedule(function()
       vim.notify(
         string.format(
-          "Failed to delete %s: %s/%s: %s",
+          "Failed to delete %s: %s/%s: \n%s",
           resource.kind,
           resource.metadata.namespace,
           resource.metadata.name,
