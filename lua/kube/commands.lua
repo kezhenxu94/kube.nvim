@@ -27,7 +27,9 @@ function M.setup()
 
       local command = args[2]
       local command_fn = M.commands[command]
-      if not command_fn then return {} end
+      if not command_fn then
+        return {}
+      end
 
       local params = {}
       local info = debug.getinfo(command_fn, "u")

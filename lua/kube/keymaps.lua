@@ -22,6 +22,8 @@ function M.setup_buffer_keymaps(buf_nr)
     end
 
     local marks = vim.api.nvim_buf_get_extmarks(buf_nr, constants.KUBE_NAMESPACE, line, line, { details = true })
+    log.debug("marks", marks)
+
     if #marks > 0 then
       local mark_id = marks[1][1]
       local resource = mark_mappings[mark_id].item

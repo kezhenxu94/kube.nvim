@@ -1,6 +1,3 @@
----@class MarkedLine
----@field item table The raw data of the resource in buffer
-
 local constants = require("kube.constants")
 local log = require("kube.log")
 local M = {}
@@ -79,7 +76,7 @@ local function handle_buffer_save(buf_nr)
       end
     end)
   else
-    local choices = { "all", "cancel" }
+    local choices = { "cancel", "all" }
     for _, resource in ipairs(resources_to_delete) do
       table.insert(choices, resource)
     end
@@ -125,10 +122,19 @@ local function handle_buffer_save(buf_nr)
     end)
   end
 end
+
+---@class MarkedLine
+---@field item table The raw data of the resource in buffer
+
+---@class MarkedColumn
+---@field item table The raw data of the resource in buffer
+---@field column string The column name of the marked column
+
 ---@class KubeBuffer
 ---@field buf_nr number The buffer number
 ---@field data table The raw data of the resource in buffer
 ---@field mark_mappings table<number, MarkedLine> Mapping of mark IDs to row data
+---@field mark_columns table<number, MarkedColumn> Mapping of mark IDs to column field
 ---@field namespace string The namespace of the resource in buffer
 ---@field resource_kind string The kind of resource in buffer
 ---@field resource_name string|nil The name of the resource in buffer
@@ -230,6 +236,7 @@ function KubeBuffer:new(buf_nr)
   local this = setmetatable({
     buf_nr = buf_nr,
     mark_mappings = {},
+    mark_columns = {},
     namespace = namespace,
     resource_kind = resource_kind,
     resource_name = resource_name,

@@ -24,6 +24,7 @@ function M.load(buffer)
   local job = kubectl.get(resource_kind, resource_name, namespace, function(result)
     vim.schedule(function()
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
+      vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
 
       if not result then
         log.debug("empty result", namespace, resource_kind, resource_name)
@@ -37,7 +38,7 @@ function M.load(buffer)
 
       self:setup()
 
-      local formatted_rows = M.format_table(headers, rows)
+      local formatted_rows, col_widths = M.format_table(headers, rows)
 
       local lines = {}
       for _, row in ipairs(formatted_rows) do
@@ -55,7 +56,23 @@ function M.load(buffer)
             item = row.raw,
           }
         end
+
+        local col_pos = 0
+        for i, col_width in ipairs(col_widths) do
+          local mark_id =
+            vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
+              end_col = col_pos + col_width,
+              invalidate = true,
+            })
+          log.debug("mark_id", mark_id, "col_pos", col_pos, "col_width", col_width)
+          self.mark_columns[mark_id] = {
+            item = row.raw,
+            column = headers[i],
+          }
+          col_pos = col_pos + col_width
+        end
       end
+
       vim.api.nvim_buf_set_option(buffer.buf_nr, "modified", false)
     end)
   end)
@@ -72,6 +89,7 @@ end
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@return FormattedTableRow[] List of objects containing formatted line, highlight, and raw data
+---@return number[] List of column widths
 function M.format_table(headers, rows)
   local col_widths = {}
   for i, header in ipairs(headers) do
@@ -97,7 +115,7 @@ function M.format_table(headers, rows)
     })
   end
 
-  return formatted_rows
+  return formatted_rows, col_widths
 end
 
 ---@param row FormattedRow List of columns

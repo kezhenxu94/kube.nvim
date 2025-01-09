@@ -28,6 +28,7 @@ local show_yaml = function(resource)
       end
 
       vim.api.nvim_set_option_value("modifiable", false, { buf = buf_nr })
+      vim.api.nvim_set_option_value("modified", false, { buf = buf_nr })
     end)
   end)
 
