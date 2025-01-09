@@ -6,7 +6,6 @@ local M = {}
 ---@return KubeConfig
 function M.defaults()
   return {
-    log = false,
     keymaps = {
       drill_down = "gd",
       refresh = "gr",

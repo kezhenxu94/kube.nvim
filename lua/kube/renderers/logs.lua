@@ -1,6 +1,5 @@
 local kubectl = require("kubectl")
 local log = require("kube.log")
-local augroup = require("kube.autocmds").augroup
 
 local M = {}
 

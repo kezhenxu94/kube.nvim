@@ -8,23 +8,8 @@ local M = {}
 
 M.augroup = augroup("kube_autocmds", { clear = true })
 
-local shutdown_jobs = function(buf_nr)
-  local buf = _G.kube_buffers[buf_nr]
-  log.debug("shutting down jobs")
-
-  if buf then
-    for job_id, _ in pairs(buf.jobs) do
-      log.debug("shutting down job", job_id)
-      vim.loop.kill(job_id, vim.loop.constants.SIGTERM)
-      buf.jobs[job_id] = nil
-    end
-  end
-
-  _G.kube_buffers[buf_nr] = nil
-end
-
 function M.setup()
-  autocmd({ "BufReadCmd" }, {
+  autocmd("BufReadCmd", {
     group = "kube_autocmds",
     pattern = "kube://*",
     callback = function(ev)
@@ -36,7 +21,7 @@ function M.setup()
     end,
   })
 
-  autocmd({ "BufDelete" }, {
+  autocmd("BufDelete", {
     group = "kube_autocmds",
     pattern = "kube://*",
     callback = function(ev)
@@ -44,7 +29,33 @@ function M.setup()
       local buf_name = vim.api.nvim_buf_get_name(buf_nr)
       log.debug("deleting buffer", buf_name, ev.buf)
 
-      shutdown_jobs(buf_nr)
+      require("kube.events.default").on_buf_deleted(buf_nr)
+    end,
+  })
+
+  autocmd("BufWriteCmd", {
+    group = "kube_autocmds",
+    pattern = "kube://*",
+    callback = function(ev)
+      local buf_nr = ev.buf
+      local buf_name = vim.api.nvim_buf_get_name(buf_nr)
+      log.debug("saving buffer", buf_name, ev.buf)
+
+      local buffer = _G.kube_buffers[buf_nr]
+      if not buffer then
+        log.error("buffer not found", buf_nr)
+        return
+      end
+
+      local resource_kind = buffer.resource_kind
+      local subresource_kind = buffer.subresource_kind
+      local handlers = require("kube.events")
+
+      if subresource_kind then
+        handlers[subresource_kind:lower()].on_buf_saved(buf_nr)
+      elseif resource_kind then
+        handlers[resource_kind:lower()].on_buf_saved(buf_nr)
+      end
     end,
   })
 end
