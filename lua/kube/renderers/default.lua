@@ -25,6 +25,7 @@ function M.load(buffer)
     vim.schedule(function()
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
+      vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
 
       if not result then
         log.debug("empty result", namespace, resource_kind, resource_name)
@@ -46,8 +47,10 @@ function M.load(buffer)
       end
       vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
 
+      local diagnostics = {}
       for row_num, row in ipairs(formatted_rows) do
         vim.api.nvim_buf_add_highlight(self.buf_nr, -1, row.highlight or "KubeBody", row_num - 1, 0, -1)
+
         if row_num > 0 and row.raw then
           local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
             invalidate = true,
@@ -71,6 +74,22 @@ function M.load(buffer)
           }
           col_pos = col_pos + col_width
         end
+
+        if row.diagnostics then
+          for _, diagnostic in ipairs(row.diagnostics) do
+            table.insert(diagnostics, {
+              bufnr = self.buf_nr,
+              lnum = row_num - 1,
+              col = 0,
+              message = diagnostic.message,
+              severity = diagnostic.severity,
+            })
+          end
+        end
+      end
+
+      if #diagnostics > 0 then
+        vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, buffer.buf_nr, diagnostics, {})
       end
 
       vim.api.nvim_buf_set_option(buffer.buf_nr, "modified", false)
@@ -86,6 +105,7 @@ end
 ---@field formatted string The formatted line with proper column spacing
 ---@field highlight string|nil The highlight group to apply to the row
 ---@field raw table The original row data
+---@field diagnostics vim.diagnostic[]|nil List of diagnostics for the row
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@return FormattedTableRow[] List of objects containing formatted line, highlight, and raw data
@@ -111,6 +131,7 @@ function M.format_table(headers, rows)
     table.insert(formatted_rows, {
       formatted = M.align_row(row.row, col_widths),
       highlight = row.row.highlight,
+      diagnostics = row.diagnostics,
       raw = row.item,
     })
   end

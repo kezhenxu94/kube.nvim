@@ -5,6 +5,7 @@
 ---@class FormattedRow
 ---@field row table The row data containing column values
 ---@field item table The original resource item data
+---@field diagnostics vim.diagnostic[]|nil List of diagnostics for the row
 
 local formatters = {
   {

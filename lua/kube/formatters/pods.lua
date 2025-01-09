@@ -1,4 +1,10 @@
+local log = require("kube.log")
 local utils = require("kube.utils")
+local finished_statuses = { "Completed", "Succeeded" }
+local severity_map = {
+  Pending = vim.diagnostic.severity.WARN,
+  Failed = vim.diagnostic.severity.ERROR,
+}
 
 ---@type Formatter
 local M = {
@@ -34,6 +40,28 @@ local M = {
         end
       end
 
+      local diagnostics = {}
+      if not vim.tbl_contains(finished_statuses, status) and pod.status.conditions then
+        if #pod.status.conditions == 1 then
+          local condition = pod.status.conditions[1]
+          local message = condition.message or condition.reason
+          table.insert(diagnostics, {
+            message = string.format("The pod is not ready: %s", message),
+            severity = severity_map[status] or vim.diagnostic.severity.ERROR,
+          })
+        end
+        log.debug("pod.status.conditions", pod.status.conditions)
+        for _, condition in ipairs(pod.status.conditions) do
+          if condition.type == "Ready" and condition.status ~= "True" then
+            local message = condition.message or condition.reason
+            table.insert(diagnostics, {
+              message = string.format("The pod is not ready: %s", message),
+              severity = severity_map[status] or vim.diagnostic.severity.ERROR,
+            })
+          end
+        end
+      end
+
       table.insert(rows, {
         row = {
           namespace,
@@ -47,6 +75,7 @@ local M = {
           highlight = highlight,
         },
         item = pod,
+        diagnostics = diagnostics,
       })
     end
     return rows
