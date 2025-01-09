@@ -12,7 +12,7 @@ local highlights = {
   KubeFailed = { fg = "#d20f39" },
   KubeSucceeded = { fg = "#9ca0b0" },
   KubeUnknown = { fg = "#6c6f85" },
-  KubeHeader = { fg = "#df8e1d", bold = true, underline = true },
+  KubeHeader = { fg = "#df8e1d", bold = true },
 }
 
 for group, colors in pairs(highlights) do
