@@ -119,20 +119,28 @@ local M = {
             port.container,
             port.port,
             local_port,
-            function(data) end,
             function(data)
-              vim.schedule(function()
-                vim.notify(data, vim.log.levels.ERROR)
-              end)
+              local key = string.format("%s/%s", namespace, name)
+              _G.portforwards[key] = _G.portforwards[key] or {}
+              _G.portforwards[key][local_port] = nil
+            end,
+            function(data)
+              if data then
+                vim.schedule(function()
+                  vim.notify(data, vim.log.levels.ERROR)
+                end)
+              end
             end
           )
 
-          local key = string.format("%s/%s", namespace, name)
-          _G.portforwards[key] = _G.portforwards[key] or {}
-          _G.portforwards[key][local_port] = {
-            container_port = port.port,
-            pid = job.pid,
-          }
+          if job then
+            local key = string.format("%s/%s", namespace, name)
+            _G.portforwards[key] = _G.portforwards[key] or {}
+            _G.portforwards[key][local_port] = {
+              container_port = port.port,
+              pid = job.pid,
+            }
+          end
 
           prompt_port_forward()
         end)

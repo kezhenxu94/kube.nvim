@@ -63,18 +63,6 @@ function M.apply(file_path, callback)
   kubectl("apply -f " .. file_path, callback)
 end
 
----@param resource_kind string The type of resource
----@param name string The name of the resource
----@param namespace string The namespace of the resource
----@param callback function Callback function to handle the output
-function M.delete(resource_kind, name, namespace, callback)
-  local cmd = "delete " .. resource_kind .. " " .. name
-  if namespace then
-    cmd = cmd .. " -n " .. namespace
-  end
-  return kubectl(cmd, callback)
-end
-
 ---@param kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
@@ -147,7 +135,8 @@ end
 ---@param container string The name of the container
 ---@param port number The port to forward
 ---@param local_port number The local port to forward to
----@param on_error fun(data: string|nil) Callback function to handle the output
+---@param callback fun(data: string|nil)|nil Callback function to handle the output
+---@param on_error fun(data: string|nil)|nil Callback function to handle the error output
 function M.forward_port(resource_kind, name, namespace, container, port, local_port, callback, on_error)
   log.debug("kubectl.forward_port", resource_kind, name, namespace, container, port, local_port)
 
