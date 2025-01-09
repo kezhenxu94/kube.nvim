@@ -39,7 +39,13 @@ function M.load(buffer)
 
       self:setup()
 
-      local formatted_rows, col_widths = M.format_table(headers, rows)
+      local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
+      local winbar_padding
+      local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
+      if wininfo and wininfo[1].textoff > 0 then
+        winbar_padding = string.rep(" ", wininfo[1].textoff)
+      end
+      vim.wo.winbar = string.format("%s%%#%s#%s", winbar_padding, header_row.highlight, header_row.formatted)
 
       local lines = {}
       for _, row in ipairs(formatted_rows) do
@@ -92,7 +98,7 @@ function M.load(buffer)
         vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, buffer.buf_nr, diagnostics, {})
       end
 
-      vim.api.nvim_buf_set_option(buffer.buf_nr, "modified", false)
+      vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
     end)
   end)
 
@@ -105,9 +111,10 @@ end
 ---@field formatted string The formatted line with proper column spacing
 ---@field highlight string|nil The highlight group to apply to the row
 ---@field raw table The original row data
----@field diagnostics vim.diagnostic[]|nil List of diagnostics for the row
+---@field diagnostics vim.Diagnostic[]|nil List of diagnostics for the row
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
+---@return FormattedTableRow The formatted header row
 ---@return FormattedTableRow[] List of objects containing formatted line, highlight, and raw data
 ---@return number[] List of column widths
 function M.format_table(headers, rows)
@@ -119,13 +126,7 @@ function M.format_table(headers, rows)
     end
   end
 
-  local formatted_rows = {
-    {
-      formatted = M.align_row(headers, col_widths),
-      highlight = "KubeHeader",
-      raw = headers,
-    },
-  }
+  local formatted_rows = {}
 
   for _, row in ipairs(rows) do
     table.insert(formatted_rows, {
@@ -136,7 +137,13 @@ function M.format_table(headers, rows)
     })
   end
 
-  return formatted_rows, col_widths
+  return {
+    formatted = M.align_row(headers, col_widths),
+    highlight = "KubeHeader",
+    raw = headers,
+  },
+    formatted_rows,
+    col_widths
 end
 
 ---@param row FormattedRow List of columns
