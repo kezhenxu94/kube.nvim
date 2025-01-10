@@ -1,6 +1,6 @@
 local KubeBuffer = require("kube.buffer").KubeBuffer
 local log = require("kube.log")
-
+local utils = require("kube.utils")
 local augroup = vim.api.nvim_create_augroup
 local autocmd = vim.api.nvim_create_autocmd
 
@@ -56,6 +56,26 @@ function M.setup()
       elseif resource_kind then
         handlers[resource_kind:lower()].on_buf_saved(buf_nr)
       end
+    end,
+  })
+
+  autocmd({ "WinScrolled" }, {
+    group = "kube_autocmds",
+    callback = function()
+      local buf_nr = vim.api.nvim_get_current_buf()
+      local buf_name = vim.api.nvim_buf_get_name(buf_nr)
+      if not buf_name:match("^kube://") then
+        return
+      end
+
+      local buffer = _G.kube_buffers[buf_nr]
+      log.debug("WinScrolled", buf_name)
+
+      if not buffer then
+        return
+      end
+
+      vim.wo.winbar = utils.get_winbar(buffer.buf_nr)
     end,
   })
 end

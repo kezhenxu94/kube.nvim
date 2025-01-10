@@ -14,6 +14,7 @@ _G.kube_buffers = {}
 
 ---@class KubeBuffer
 ---@field buf_nr number The buffer number
+---@field header_row FormattedTableRow The header row of the buffer
 ---@field data table The raw data of the resource in buffer
 ---@field mark_mappings table<number, MarkedLine> Mapping of mark IDs to row data
 ---@field mark_columns table<number, MarkedColumn> Mapping of mark IDs to column field

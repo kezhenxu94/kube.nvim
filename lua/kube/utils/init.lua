@@ -1,3 +1,5 @@
+local log = require("kube.log")
+
 local M = {}
 
 function M.calculate_age(created)
@@ -33,6 +35,31 @@ function M.calculate_age(created)
   else
     return string.format("%dd", math.floor(age_secs / 86400))
   end
+end
+
+function M.get_winbar(buf_nr)
+  local buffer = _G.kube_buffers[buf_nr]
+  if not buffer or not buffer.header_row then
+    return ""
+  end
+
+  local header_row = buffer.header_row
+  local winbar_padding
+  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
+  if wininfo and wininfo[1].textoff > 0 then
+    winbar_padding = string.rep(" ", wininfo[1].textoff)
+  end
+
+  local view = vim.fn.winsaveview()
+  local scroll_offset = view.leftcol
+  local truncated_header = header_row.formatted:sub(scroll_offset + 1)
+  log.debug("scroll_offset", scroll_offset, "truncated_header", truncated_header)
+
+  local winwidth = vim.api.nvim_win_get_width(0)
+  truncated_header = truncated_header:sub(1, winwidth - #winbar_padding)
+  log.debug("winwidth", winwidth, "truncated_header", truncated_header)
+
+  return string.format("%s%%#%s#%s", winbar_padding, header_row.highlight, truncated_header)
 end
 
 return M

@@ -1,6 +1,7 @@
 local constants = require("kube.constants")
 local formatters = require("kube.formatters")
 local log = require("kube.log")
+local utils = require("kube.utils")
 
 local M = {}
 
@@ -40,12 +41,8 @@ function M.load(buffer)
       self:setup()
 
       local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
-      local winbar_padding
-      local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
-      if wininfo and wininfo[1].textoff > 0 then
-        winbar_padding = string.rep(" ", wininfo[1].textoff)
-      end
-      vim.wo.winbar = string.format("%s%%#%s#%s", winbar_padding, header_row.highlight, header_row.formatted)
+      buffer.header_row = header_row
+      vim.wo.winbar = utils.get_winbar(self.buf_nr)
 
       local lines = {}
       for _, row in ipairs(formatted_rows) do
@@ -112,6 +109,7 @@ end
 ---@field highlight string|nil The highlight group to apply to the row
 ---@field raw table The original row data
 ---@field diagnostics vim.Diagnostic[]|nil List of diagnostics for the row
+
 ---@param headers string[] List of column headers
 ---@param rows FormattedRow[] List of row data
 ---@return FormattedTableRow The formatted header row
