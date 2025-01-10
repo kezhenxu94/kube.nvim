@@ -56,6 +56,13 @@ M.commands = {
   delete = function(resource_kind, resource_name, namespace)
     require("kube").delete(resource_kind, resource_name, namespace)
   end,
+
+  ctx = function(context)
+    require("kube").ctx(context)
+  end,
+  context = function(context)
+    require("kube").ctx(context)
+  end,
 }
 
 return M

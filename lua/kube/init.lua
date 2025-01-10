@@ -81,4 +81,55 @@ function M.delete(resource_kind, resource_name, namespace)
   end)
 end
 
+---@param context string|nil The context to switch to, defaults to nil, and will prompt the user to select a context
+function M.ctx(context)
+  if context then
+    require("kubectl").use_context(context, function(result)
+      if result then
+        vim.notify(string.format("Switched to context: %s", context))
+      end
+    end, function(error)
+      vim.notify(string.format("Failed to switch to context: %s: \n%s", context, error), vim.log.levels.ERROR)
+    end)
+    return
+  end
+
+  require("kubectl").get_config(function(result)
+    if not result then
+      vim.schedule(function()
+        vim.notify("No config found", vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    vim.schedule(function()
+      local config = vim.fn.json_decode(result)
+      local contexts = config.contexts
+      if not contexts then
+        vim.schedule(function()
+          vim.notify("No contexts found", vim.log.levels.ERROR)
+        end)
+        return
+      end
+
+      local current_context = config["current-context"]
+      vim.ui.select(contexts, {
+        prompt = string.format("Select context (current: %s)", current_context),
+        format_item = function(item)
+          local is_current = item.name == current_context
+          return string.format("%s%s", is_current and "* " or "  ", item.name)
+        end,
+      }, function(choice)
+        require("kubectl").use_context(choice.name, function(result)
+          if result then
+            vim.notify(string.format("Switched to context: %s", choice.name))
+          end
+        end, function(error)
+          vim.notify(string.format("Failed to switch to context: %s: \n%s", choice.name, error), vim.log.levels.ERROR)
+        end)
+      end)
+    end)
+  end)
+end
+
 return M

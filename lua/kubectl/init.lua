@@ -179,4 +179,18 @@ function M.get_current_context()
   return result and result[1] or nil
 end
 
+---@param callback function Callback function to handle the output
+---@return Job|nil The job object, or nil if the job is not started
+function M.get_config(callback)
+  return kubectl("config view -o json", callback)
+end
+
+---@param name string The name of the context to use
+---@param callback function Callback function to handle the output
+---@param on_error fun(data: string|nil) Callback function to handle the error output
+---@return Job|nil The job object, or nil if the job is not started
+function M.use_context(name, callback, on_error)
+  return kubectl("config use-context " .. name, callback, on_error)
+end
+
 return M
