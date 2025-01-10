@@ -17,9 +17,6 @@ function M.setup_buffer_keymaps(buf_nr)
   ---@type fun(): table<string, any>|nil
   local resource_under_cursor = function()
     local line = vim.api.nvim_win_get_cursor(0)[1]
-    if line == 1 then
-      return nil
-    end
 
     local marks = vim.api.nvim_buf_get_extmarks(buf_nr, constants.KUBE_NAMESPACE, line, line, { details = true })
     log.debug("marks", marks)
