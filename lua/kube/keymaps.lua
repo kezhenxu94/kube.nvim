@@ -46,7 +46,10 @@ function M.setup_buffer_keymaps(buf_nr)
         namespace = kbuf.namespace,
       })
     end
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: drill down to the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.show_logs, function()
     local resource = resource_under_cursor()
@@ -63,7 +66,10 @@ function M.setup_buffer_keymaps(buf_nr)
         namespace = kbuf.namespace,
       })
     end
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: show logs for the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.follow_logs, function()
     local resource = resource_under_cursor()
@@ -80,7 +86,10 @@ function M.setup_buffer_keymaps(buf_nr)
         namespace = kbuf.namespace,
       })
     end
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: follow logs for the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.port_forward, function()
     local resource = resource_under_cursor()
@@ -97,7 +106,10 @@ function M.setup_buffer_keymaps(buf_nr)
         namespace = kbuf.namespace,
       })
     end
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: show port forwards for the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.forward_port, function()
     local resource = resource_under_cursor()
@@ -114,7 +126,10 @@ function M.setup_buffer_keymaps(buf_nr)
         namespace = kbuf.namespace,
       })
     end
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: forward ports for the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.show_yaml, function()
     local resource = resource_under_cursor()
@@ -123,7 +138,10 @@ function M.setup_buffer_keymaps(buf_nr)
     end
 
     require("kube.actions.default").show_yaml(resource, nil)
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: show YAML for the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.describe, function()
     local resource = resource_under_cursor()
@@ -132,7 +150,10 @@ function M.setup_buffer_keymaps(buf_nr)
     end
 
     actions[resource.kind:lower()].describe(resource, nil)
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: describe the resource under the cursor",
+  })
 
   vim.keymap.set("n", config.keymaps.refresh, function()
     local parts = {}
@@ -151,7 +172,10 @@ function M.setup_buffer_keymaps(buf_nr)
     vim.notify(string.format("Refreshing %s", table.concat(parts, "/")))
 
     kbuf:load()
-  end, { buffer = buf })
+  end, {
+    buffer = buf,
+    desc = "kube: refresh the resources in the buffer",
+  })
 end
 
 return M
