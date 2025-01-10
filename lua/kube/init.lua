@@ -120,6 +120,10 @@ function M.ctx(context)
           return string.format("%s%s", is_current and "* " or "  ", item.name)
         end,
       }, function(choice)
+        if not choice then
+          return
+        end
+
         require("kubectl").use_context(choice.name, function(result)
           if result then
             vim.notify(string.format("Switched to context: %s", choice.name))
