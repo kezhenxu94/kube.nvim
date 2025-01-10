@@ -62,4 +62,13 @@ function M.get_winbar(buf_nr)
   return string.format("%s%%#%s#%s", winbar_padding, header_row.highlight, truncated_header)
 end
 
+function M.lualine()
+  local context = require("kubectl").get_current_context()
+  local icon = vim.fn.nr2char(0xE81D)
+  if context then
+    return icon .. " " .. context
+  end
+  return ""
+end
+
 return M

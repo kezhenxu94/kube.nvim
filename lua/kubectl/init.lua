@@ -168,4 +168,15 @@ function M.delete(resource_kind, name, namespace, callback, on_error)
   return kubectl(cmd, callback, on_error)
 end
 
+---@return string The current context
+function M.get_current_context()
+  local job = Job:new({
+    command = "kubectl",
+    args = { "config", "current-context" },
+  })
+  job:sync()
+  local result = job:result()
+  return result and result[1] or nil
+end
+
 return M
