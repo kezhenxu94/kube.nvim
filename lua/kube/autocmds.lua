@@ -78,6 +78,13 @@ function M.setup()
       vim.wo.winbar = utils.get_winbar(buffer.buf_nr)
     end,
   })
+
+  autocmd("ColorScheme", {
+    group = "kube_autocmds",
+    callback = function()
+      require("kube.highlights").setup()
+    end,
+  })
 end
 
 return M
