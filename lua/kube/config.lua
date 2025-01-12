@@ -1,6 +1,6 @@
 ---@class KubeConfig
----@field keymaps table<string, string>
-
+---@field keymaps table<string, string>|nil
+---@field highlights Highlights|nil
 local M = {}
 
 ---@return KubeConfig

@@ -12,9 +12,9 @@ function M.setup(opts)
   opts = opts or {}
 
   require("kube.config").setup(opts)
+  require("kube.highlights").setup(opts)
   require("kube.autocmds").setup()
   require("kube.commands").setup()
-  require("kube.highlights").setup()
 
   vim.api.nvim_create_autocmd("VimLeavePre", {
     callback = function()
@@ -113,8 +113,8 @@ function M.ctx(context)
           return
         end
 
-        require("kubectl").use_context(choice.name, function(result)
-          if result then
+        require("kubectl").use_context(choice.name, function(output)
+          if output then
             vim.notify(string.format("Switched to context: %s", choice.name))
           end
         end, function(error)
