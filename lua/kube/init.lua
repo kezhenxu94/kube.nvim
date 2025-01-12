@@ -50,8 +50,11 @@ function M.setup(opts)
 end
 
 ---@param resource_kind string The resource kind to get
----@param namespace string|nil The namespace to get the resource from, defaults to nil, which means the default namespace, use "all" to get from all namespaces
-function M.get(resource_kind, namespace)
+---@param params table<string, string>|nil The parameters to pass to the get command
+function M.get(resource_kind, params)
+  params = params or {}
+
+  local namespace = params.namespace
   local buf_name
   if not namespace or namespace:lower() == "all" then
     buf_name = string.format("kube://%s", resource_kind)

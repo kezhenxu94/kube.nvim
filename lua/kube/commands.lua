@@ -1,21 +1,78 @@
 local M = {}
 
+---@class CommandBase
+---@field parse fun(args: string[]): table Parse command arguments into parameters
+---@field complete fun(arglead: string, args: string[]): string[] Provide completions for the command
+local CommandBase = {}
+
+---@class GetCommand : CommandBase
+local GetCommand = {
+  ---@param args string[]
+  parse = function(args)
+    local kind = table.remove(args, 1)
+    local params = {}
+    for _, arg in ipairs(args) do
+      local key, value = arg:match("^(.+)=(.+)$")
+      if key then
+        params[key] = value
+      end
+    end
+    return { kind = kind, params = params }
+  end,
+
+  complete = function(arglead, args)
+    local kinds = require("kubectl").api_resources_sync()
+    if #args <= 1 then
+      if arglead and arglead ~= "" then
+        return vim.tbl_filter(function(kind)
+          return vim.startswith(kind:lower(), arglead:lower())
+        end, kinds)
+      end
+      return kinds
+    end
+
+    local params = { "namespace" }
+    return params
+  end,
+}
+
+---@class ContextCommand : CommandBase
+local ContextCommand = {
+  parse = function(args)
+    return { context = args[1] }
+  end,
+
+  complete = function(arglead, args)
+    return {}
+  end,
+}
+
+M.command_handlers = {
+  get = GetCommand,
+  delete = GetCommand,
+  context = ContextCommand,
+}
+
 function M.setup()
   vim.api.nvim_create_user_command("Kube", function(opts)
     local args = vim.split(opts.args, " ", { trimempty = true })
-    local command = args[1]
+    local command = table.remove(args, 1)
 
-    if M.commands[command] then
-      M.commands[command](unpack(args, 2))
-    else
+    local handler = M.command_handlers[command]
+    if not handler then
       vim.notify("No such command: " .. (command or ""), vim.log.levels.ERROR)
+      return
     end
+
+    local parsed = handler.parse(args)
+    M.commands[command](parsed.kind, parsed.params)
   end, {
     nargs = "*",
     complete = function(arglead, cmdline)
-      local args = vim.split(cmdline, " ", { trimempty = true })
+      local args = vim.split(cmdline, " ", { trimempty = false })
+      table.remove(args, 1) -- Remove the command name "Kube"
 
-      if #args <= 2 then
+      if #args <= 1 then
         local commands = vim.tbl_keys(M.commands)
         if arglead and arglead ~= "" then
           return vim.tbl_filter(function(cmd)
@@ -25,41 +82,22 @@ function M.setup()
         return commands
       end
 
-      local command = args[2]
-      local command_fn = M.commands[command]
-      if not command_fn then
-        return {}
-      end
-
-      local params = {}
-      local info = debug.getinfo(command_fn, "u")
-      for i = 1, info.nparams do
-        local param_name = debug.getlocal(command_fn, i)
-        table.insert(params, param_name)
-      end
-
-      if arglead and arglead ~= "" then
-        return vim.tbl_filter(function(param)
-          return vim.startswith(param, arglead)
-        end, params)
-      end
-      return params
+      local command = table.remove(args, 1)
+      local handler = M.command_handlers[command]
+      return handler.complete(arglead, args)
     end,
   })
 end
 
 M.commands = {
-  get = function(resource_kind, namespace)
-    require("kube").get(resource_kind, namespace)
+  get = function(resource_kind, params)
+    require("kube").get(resource_kind, params)
   end,
 
-  delete = function(resource_kind, resource_name, namespace)
-    require("kube").delete(resource_kind, resource_name, namespace)
+  delete = function(resource_kind, params)
+    require("kube").delete(resource_kind, params)
   end,
 
-  ctx = function(context)
-    require("kube").ctx(context)
-  end,
   context = function(context)
     require("kube").ctx(context)
   end,

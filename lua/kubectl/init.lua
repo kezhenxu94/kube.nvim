@@ -193,4 +193,14 @@ function M.use_context(name, callback, on_error)
   return kubectl("config use-context " .. name, callback, on_error)
 end
 
+function M.api_resources_sync()
+  local job = Job:new({
+    command = "kubectl",
+    args = { "api-resources", "--output=name" },
+  })
+  job:sync()
+  local result = job:result()
+  return result or {}
+end
+
 return M
