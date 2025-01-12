@@ -21,8 +21,8 @@ local GetCommand = {
   end,
 
   complete = function(arglead, args)
-    local kinds = require("kubectl").api_resources_sync()
     if #args <= 1 then
+      local kinds = require("kubectl").api_resources_sync()
       if arglead and arglead ~= "" then
         return vim.tbl_filter(function(kind)
           return vim.startswith(kind:lower(), arglead:lower())
@@ -39,7 +39,7 @@ local GetCommand = {
 ---@class ContextCommand : CommandBase
 local ContextCommand = {
   parse = function(args)
-    return args[1]
+    return { args[1] }
   end,
 
   complete = function(arglead, args)
@@ -65,7 +65,7 @@ function M.setup()
     end
 
     local parsed = handler.parse(args)
-    M.commands[command](parsed)
+    M.commands[command](unpack(parsed))
   end, {
     nargs = "*",
     complete = function(arglead, cmdline)
@@ -84,7 +84,7 @@ function M.setup()
 
       local command = table.remove(args, 1)
       local handler = M.command_handlers[command]
-      return handler.complete(arglead, args)
+      return handler and handler.complete(arglead, args) or {}
     end,
   })
 end
