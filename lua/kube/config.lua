@@ -7,14 +7,14 @@ local M = {}
 function M.defaults()
   return {
     keymaps = {
-      drill_down = "gd",
+      drill_down = "<cr>",
+      describe = "gd",
       refresh = "gr",
       show_logs = "gl",
       follow_logs = "gL",
       port_forward = "gF",
       forward_port = "gf",
       show_yaml = "gy",
-      describe = "gD",
     },
   }
 end

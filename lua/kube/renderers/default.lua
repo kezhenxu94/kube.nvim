@@ -52,11 +52,11 @@ function M.load(buffer)
 
       local diagnostics = {}
       for row_num, row in ipairs(formatted_rows) do
-        vim.api.nvim_buf_add_highlight(self.buf_nr, -1, row.highlight or "KubeBody", row_num - 1, 0, -1)
-
-        if row_num > 0 and row.raw then
+        if row.raw then
           local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+            end_row = row_num,
             invalidate = true,
+            hl_group = row.highlight or "KubeBody",
           })
           self.mark_mappings[mark_id] = {
             item = row.raw,
