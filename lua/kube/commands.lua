@@ -17,7 +17,7 @@ local GetCommand = {
         params[key] = value
       end
     end
-    return { kind = kind, params = params }
+    return { kind, params }
   end,
 
   complete = function(arglead, args)
@@ -39,11 +39,11 @@ local GetCommand = {
 ---@class ContextCommand : CommandBase
 local ContextCommand = {
   parse = function(args)
-    return { context = args[1] }
+    return args[1]
   end,
 
   complete = function(arglead, args)
-    return {}
+    return require("kubectl").context_names_sync()
   end,
 }
 
@@ -65,7 +65,7 @@ function M.setup()
     end
 
     local parsed = handler.parse(args)
-    M.commands[command](parsed.kind, parsed.params)
+    M.commands[command](parsed)
   end, {
     nargs = "*",
     complete = function(arglead, cmdline)
