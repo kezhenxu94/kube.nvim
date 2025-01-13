@@ -19,7 +19,7 @@ local M = {
         for local_port, portforward in pairs(portforwards) do
           if portforward.container_port == container_port then
             table.insert(ports, string.format("%d:%d", local_port, container_port))
-            table.insert(urls, string.format("http://localhost:%d", local_port))
+            table.insert(urls, string.format("localhost:%d", local_port))
           end
         end
       end
