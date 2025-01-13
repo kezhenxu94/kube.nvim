@@ -12,17 +12,18 @@ function M.load(buffer)
   local resource_name = self.resource_name
   local subresource_kind = self.subresource_kind
   local namespace = self.namespace
+  local params = self.params
   local formatter = formatters[resource_kind]
   if subresource_kind and formatters[subresource_kind] then
     formatter = formatters[subresource_kind]
     log.debug("formatter for subresource found", subresource_kind, formatter)
   end
 
-  log.debug("loading buffer", resource_kind, resource_name, namespace, subresource_kind)
+  log.debug("loading buffer", resource_kind, resource_name, namespace, subresource_kind, params)
 
   local headers = formatter.headers
   local kubectl = require("kubectl")
-  local job = kubectl.get(resource_kind, resource_name, namespace, function(result)
+  local job = kubectl.get(resource_kind, resource_name, namespace, params, function(result)
     vim.schedule(function()
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)

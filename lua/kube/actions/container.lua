@@ -68,6 +68,10 @@ local M = {
 
     vim.cmd.edit(buf_name)
   end,
+
+  forward_port = function(resource, parent)
+    log.debug("forwarding port for container", resource.name, "in pod", parent.name)
+  end,
 }
 
 return M

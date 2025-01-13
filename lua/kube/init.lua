@@ -38,14 +38,31 @@ end
 ---@param resource_kind string The resource kind to get
 ---@param params table<string, string>|nil The parameters to pass to the get command
 function M.get(resource_kind, params)
+  require("kube.log").debug("resource_kind", resource_kind, "params", params)
+
   params = params or {}
 
   local namespace = params.namespace
+  params.namespace = nil
+
+  local queries = {}
+  for key, value in pairs(params) do
+    table.insert(queries, string.format("%s=%s", key, value))
+  end
+  local query = table.concat(queries, "&")
+
   local buf_name
+
   if not namespace or namespace:lower() == "all" then
     buf_name = string.format("kube://%s", resource_kind)
   else
     buf_name = string.format("kube://namespaces/%s/%s", namespace, resource_kind)
+  end
+
+  require("kube.log").debug("buf_name", buf_name, "query", query)
+
+  if query and query ~= "" then
+    buf_name = buf_name .. "?" .. query
   end
 
   vim.cmd.edit(buf_name)
@@ -84,6 +101,8 @@ function M.ctx(context)
   end
 
   require("kubectl").get_config(function(result)
+    require("kube.log").debug("result", result)
+
     if not result then
       vim.schedule(function()
         vim.notify("No config found", vim.log.levels.ERROR)
@@ -94,7 +113,8 @@ function M.ctx(context)
     vim.schedule(function()
       local config = vim.fn.json_decode(result)
       local contexts = config.contexts
-      if not contexts then
+
+      if contexts == vim.NIL or vim.tbl_isempty(contexts) then
         vim.schedule(function()
           vim.notify("No contexts found", vim.log.levels.ERROR)
         end)

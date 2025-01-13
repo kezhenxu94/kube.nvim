@@ -7,6 +7,8 @@ local M = {}
 ---@param callback fun(data: string|nil)|nil Callback function to handle the output
 ---@param on_error fun(data: string|nil)|nil Callback function to handle the erroroutput
 local function kubectl(cmd, callback, on_error)
+  log.debug("kubectl.kubectl", cmd)
+
   local job = Job:new({
     command = "kubectl",
     args = vim.split(cmd, " "),
@@ -39,9 +41,10 @@ end
 ---@param resource_kind string The type of resource
 ---@param name string|nil The name of the resource, or nil to list all resources of the given type
 ---@param namespace string|nil The namespace of the resource, or nil to list all resources in all namespaces
+---@param params table<string, any>|nil The parameters to pass to the get command
 ---@param callback function Callback function to handle the output
-function M.get(resource_kind, name, namespace, callback)
-  log.debug("kubectl.get", resource_kind, name, namespace)
+function M.get(resource_kind, name, namespace, params, callback)
+  log.debug("kubectl.get", resource_kind, name, namespace, params)
 
   local cmd = "get " .. resource_kind .. " -o json"
   if name then
@@ -54,6 +57,13 @@ function M.get(resource_kind, name, namespace, callback)
       cmd = cmd .. " -n " .. namespace
     end
   end
+
+  if params then
+    for key, value in pairs(params) do
+      cmd = cmd .. " --" .. key .. "=" .. value
+    end
+  end
+
   return kubectl(cmd, callback)
 end
 

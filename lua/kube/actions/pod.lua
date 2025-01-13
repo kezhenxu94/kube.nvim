@@ -84,7 +84,7 @@ local M = {
 
     local function prompt_port_forward()
       vim.ui.select(port_strings, {
-        prompt = "Select container port to forward (q to quit):",
+        prompt = "Select container port to forward (q to finish):",
       }, function(choice, idx)
         if not choice or not idx then
           return

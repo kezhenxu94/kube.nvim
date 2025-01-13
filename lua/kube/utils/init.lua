@@ -1,5 +1,3 @@
-local log = require("kube.log")
-
 local M = {}
 
 function M.calculate_age(created)
@@ -38,6 +36,8 @@ function M.calculate_age(created)
 end
 
 function M.get_winbar(buf_nr)
+  local log = require("kube.log")
+
   local buffer = _G.kube_buffers[buf_nr]
   if not buffer or not buffer.header_row then
     return ""

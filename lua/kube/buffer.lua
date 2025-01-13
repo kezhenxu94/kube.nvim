@@ -39,13 +39,17 @@ function KubeBuffer:new(buf_nr)
   end
 
   local buf_name = vim.api.nvim_buf_get_name(buf_nr)
-  local namespace, resource_kind, resource_name, subresource_kind, subresource_name, remainders, params
-  local ns_pattern = "kube://namespaces/([^/?]+)/([^/?]+)/?(.*)"
+  local namespace, resource_kind, resource_name, subresource_kind, subresource_name, remainders
+  local path_params_pattern = "kube://([^?]+)??(.*)"
+  local path, params = buf_name:match(path_params_pattern)
+  log.debug("path", path, "params", params)
 
-  namespace, resource_kind, remainders = buf_name:match(ns_pattern)
+  local ns_pattern = "namespaces/([^/?]+)/([^/?]+)/?(.*)"
+
+  namespace, resource_kind, remainders = path:match(ns_pattern)
   if not namespace then
-    local cluster_pattern = "kube://([^/?]+)/?(.*)"
-    resource_kind, remainders = buf_name:match(cluster_pattern)
+    local cluster_pattern = "([^/?]+)/?(.*)"
+    resource_kind, remainders = path:match(cluster_pattern)
     namespace = "all"
   end
 
@@ -94,26 +98,20 @@ function KubeBuffer:new(buf_nr)
     remainders
   )
 
-  if remainders then
-    local params_pattern = "([^/?]+)/?(.*)"
-    params, remainders = remainders:match(params_pattern)
-    log.debug("params", params, "remainders", remainders)
-
-    if params then
-      local param_table = {}
-      for param_str in params:gmatch("[^&]+") do
-        local key, value = param_str:match("([^=]+)=?(.*)")
-        if value == "" then
-          value = true
-        elseif value == "true" then
-          value = true
-        elseif value == "false" then
-          value = false
-        end
-        param_table[key] = value
+  if params then
+    local param_table = {}
+    for param_str in params:gmatch("[^&]+") do
+      local key, value = param_str:match("([^=]+)=?(.*)")
+      if value == "" then
+        value = true
+      elseif value == "true" then
+        value = true
+      elseif value == "false" then
+        value = false
       end
-      params = param_table
+      param_table[key] = value
     end
+    params = param_table
   end
 
   local this = setmetatable({

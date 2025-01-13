@@ -31,7 +31,12 @@ local GetCommand = {
       return kinds
     end
 
-    local params = { "namespace" }
+    local params = { "namespace", "selector" }
+    if arglead and arglead ~= "" then
+      return vim.tbl_filter(function(param)
+        return vim.startswith(param, arglead)
+      end, params)
+    end
     return params
   end,
 }

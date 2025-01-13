@@ -1,3 +1,5 @@
+local log = require("kube.log")
+
 ---@class ParentResource
 ---@field kind string
 ---@field name string?
@@ -28,6 +30,8 @@ return setmetatable(M, {
 
     return setmetatable({}, {
       __index = function(_, action_name)
+        log.debug("actions", key, action_name)
+
         local action = resource_actions[action_name]
         if action then
           return action
