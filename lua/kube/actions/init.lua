@@ -37,7 +37,14 @@ return setmetatable(M, {
           return action
         end
 
-        return default_actions[action_name]
+        action = default_actions[action_name]
+        if action then
+          return action
+        end
+
+        log.error("Unsupported action", action_name, "for", key)
+
+        return nil
       end,
     })
   end,

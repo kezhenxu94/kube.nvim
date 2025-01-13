@@ -55,9 +55,8 @@ function M.load(buffer)
       for row_num, row in ipairs(formatted_rows) do
         if row.raw then
           local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
-            end_row = row_num,
             invalidate = true,
-            hl_group = row.highlight or "KubeBody",
+            line_hl_group = row.highlight or "KubeBody",
           })
           self.mark_mappings[mark_id] = {
             item = row.raw,
