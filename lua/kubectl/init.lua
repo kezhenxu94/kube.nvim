@@ -142,13 +142,12 @@ end
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
----@param container string The name of the container
 ---@param port number The port to forward
 ---@param local_port number The local port to forward to
 ---@param callback fun(data: string|nil)|nil Callback function to handle the output
 ---@param on_error fun(data: string|nil)|nil Callback function to handle the error output
-function M.forward_port(resource_kind, name, namespace, container, port, local_port, callback, on_error)
-  log.debug("kubectl.forward_port", resource_kind, name, namespace, container, port, local_port)
+function M.forward_port(resource_kind, name, namespace, port, local_port, callback, on_error)
+  log.debug("kubectl.forward_port", resource_kind, name, namespace, port, local_port)
 
   local cmd = string.format("port-forward %s/%s -n %s %d:%d", resource_kind, name, namespace, local_port, port)
   return kubectl(cmd, callback, on_error)

@@ -70,7 +70,21 @@ local M = {
   end,
 
   forward_port = function(resource, parent)
-    log.debug("forwarding port for container", resource.name, "in pod", parent.name)
+    log.debug("forwarding port for container", resource, "in pod", parent.name)
+
+    local kind = parent.kind:lower()
+    local name = parent.name
+    local namespace = parent.namespace
+
+    local ports = {}
+    for _, port in ipairs(resource.ports or {}) do
+      table.insert(ports, {
+        container = resource.name,
+        port = port.containerPort,
+        protocol = port.protocol or "TCP",
+      })
+    end
+    require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
   end,
 }
 
