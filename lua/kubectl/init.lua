@@ -224,4 +224,19 @@ function M.context_names_sync()
   return result or {}
 end
 
+---@param namespace string The namespace to apply the YAML resource to
+---@param file_path string The path to the YAML file
+---@param callback function Callback function to handle the output
+---@param on_error fun(data: string|nil)|nil Callback function to handle the error output
+---@return Job|nil The job object, or nil if the job is not started
+function M.apply(namespace, file_path, callback, on_error)
+  local job = kubectl("apply -f " .. file_path, function(result)
+    if callback then
+      callback(result)
+    end
+  end, on_error)
+
+  return job
+end
+
 return M

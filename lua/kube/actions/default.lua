@@ -1,8 +1,8 @@
 local KubeBuffer = require("kube.buffer").KubeBuffer
 
 ---@param resource table
----@param output string|nil
-local show_resource = function(resource, output)
+---@param params table
+local show_resource = function(resource, params)
   local kind = resource.kind
   local name = resource.metadata.name
   local namespace = resource.metadata.namespace
@@ -14,8 +14,12 @@ local show_resource = function(resource, output)
     buf_name = string.format("kube://%s/%s", string.lower(kind), name)
   end
 
-  if output then
-    buf_name = buf_name .. "?output=" .. output
+  if params and next(params) then
+    local query_params = {}
+    for key, value in pairs(params) do
+      table.insert(query_params, key .. "=" .. tostring(value))
+    end
+    buf_name = buf_name .. "?" .. table.concat(query_params, "&")
   end
 
   vim.cmd.edit(buf_name)
@@ -24,15 +28,19 @@ end
 ---@type Actions
 local M = {
   drill_down_resource = function(resource, parent)
-    show_resource(resource, "yaml")
+    show_resource(resource, { output = "yaml" })
   end,
 
   show_yaml = function(resource, parent)
-    show_resource(resource, "yaml")
+    show_resource(resource, { output = "yaml" })
   end,
 
   describe = function(resource, parent)
     show_resource(resource, nil)
+  end,
+
+  edit = function(resource, parent)
+    show_resource(resource, { output = "yaml", edit = true })
   end,
 
   delete = function(resource, parent)
