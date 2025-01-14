@@ -13,7 +13,7 @@ local formatters = {
     require("kube.formatters.pods"),
   },
   {
-    { "deployments", "deployment", "deploy" },
+    { "deployments", "deployment", "deploy", "deployments.apps" },
     require("kube.formatters.deployments"),
   },
   {
@@ -47,6 +47,10 @@ local formatters = {
   {
     { "portforward" },
     require("kube.formatters.portforward"),
+  },
+  {
+    { "cronjobs", "cronjob", "cronjobs.batch" },
+    require("kube.formatters.cronjobs"),
   },
 }
 
