@@ -19,6 +19,7 @@ local actions = {
   pod = require("kube.actions.pod"),
   container = require("kube.actions.container"),
   containers = require("kube.actions.container"),
+  deployment = require("kube.actions.deployment"),
 }
 
 ---@type table<string, Actions>
