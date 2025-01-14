@@ -1,4 +1,3 @@
-local constants = require("kube.constants")
 local log = require("kube.log")
 local M = {}
 

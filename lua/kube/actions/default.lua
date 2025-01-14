@@ -1,61 +1,38 @@
 local KubeBuffer = require("kube.buffer").KubeBuffer
 
-local show_yaml = function(resource)
+---@param resource table
+---@param output string|nil
+local show_resource = function(resource, output)
   local kind = resource.kind
   local name = resource.metadata.name
   local namespace = resource.metadata.namespace
 
   local buf_name
   if namespace then
-    buf_name = string.format("kube://namespaces/%s/%s/%s.yaml", namespace, kind:lower(), name)
+    buf_name = string.format("kube://namespaces/%s/%s/%s", namespace, kind:lower(), name)
   else
-    buf_name = string.format("kube://%s/%s.yaml", string.lower(kind), name)
+    buf_name = string.format("kube://%s/%s", string.lower(kind), name)
   end
-  local buf_nr = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf_nr, buf_name)
 
-  vim.api.nvim_set_option_value("modifiable", true, { buf = buf_nr })
-  vim.api.nvim_set_option_value("filetype", "yaml", { buf = buf_nr })
-
-  vim.api.nvim_set_current_buf(buf_nr)
-
-  local job = require("kubectl").get_resource_yaml(kind, name, namespace, function(yaml)
-    vim.schedule(function()
-      if yaml then
-        vim.api.nvim_buf_set_lines(buf_nr, 0, -1, false, vim.split(yaml, "\n"))
-      else
-        vim.api.nvim_buf_set_lines(buf_nr, 0, -1, false, { "Failed to get resource YAML" })
-      end
-
-      vim.api.nvim_set_option_value("modifiable", false, { buf = buf_nr })
-      vim.api.nvim_set_option_value("modified", false, { buf = buf_nr })
-    end)
-  end)
-
-  if job then
-    local buf = KubeBuffer:new(buf_nr)
-    buf.jobs[job.pid] = job
+  if output then
+    buf_name = buf_name .. "?output=" .. output
   end
+
+  vim.cmd.edit(buf_name)
 end
 
 ---@type Actions
 local M = {
-  drill_down_resource = show_yaml,
-  show_yaml = show_yaml,
+  drill_down_resource = function(resource, parent)
+    show_resource(resource, "yaml")
+  end,
+
+  show_yaml = function(resource, parent)
+    show_resource(resource, "yaml")
+  end,
 
   describe = function(resource, parent)
-    local kind = resource.kind
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-
-    local buf_name
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/%s/%s", namespace, kind:lower(), name)
-    else
-      buf_name = string.format("kube://%s/%s", string.lower(kind), name)
-    end
-
-    vim.cmd.edit(buf_name)
+    show_resource(resource, nil)
   end,
 
   delete = function(resource, parent)
