@@ -23,7 +23,7 @@ _G.kube_buffers = {}
 ---@field resource_name string|nil The name of the resource in buffer
 ---@field subresource_kind string|nil The kind of the subresource in buffer
 ---@field subresource_name string|nil The name of the subresource in buffer
----@field params string|nil The parameters of the resource in buffer
+---@field params table<string, any>|nil The parameters of the resource in buffer
 ---@field jobs table<number, Job> The jobs running in the buffer
 local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer

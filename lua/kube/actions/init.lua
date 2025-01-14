@@ -13,6 +13,7 @@ local log = require("kube.log")
 ---@field forward_port fun(resource: table, parent: ParentResource|nil)|nil -- Forward the port for the resource
 ---@field describe fun(resource: table, parent: ParentResource|nil)|nil -- Describe the resource
 ---@field delete fun(resource: table, parent: ParentResource|nil)|nil -- Delete the resource
+---@field edit fun(resource: table, parent: ParentResource|nil)|nil -- Edit the resource
 
 local actions = {
   pod = require("kube.actions.pod"),
