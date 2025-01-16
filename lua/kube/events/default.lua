@@ -58,18 +58,20 @@ local function handle_buffer_save(buf_nr)
   if #resources_to_delete == 1 then
     local resource = resources_to_delete[1]
     local msg = string.format("Delete %s: %s/%s?", resource.kind, resource.metadata.namespace, resource.metadata.name)
-    vim.ui.select({ "Yes", "No" }, {
-      prompt = msg,
-    }, function(choice)
-      if choice == "Yes" then
-        delete_resource(resource, function(result)
-          if result then
-            buffer:load()
-          end
-        end)
-      else
-        vim.notify("Deletion cancelled")
-      end
+    vim.schedule(function()
+      vim.ui.select({ "Yes", "No" }, {
+        prompt = msg,
+      }, function(choice)
+        if choice == "Yes" then
+          delete_resource(resource, function(result)
+            if result then
+              buffer:load()
+            end
+          end)
+        else
+          vim.notify("Deletion cancelled")
+        end
+      end)
     end)
   else
     local choices = { "cancel", "all" }
@@ -79,42 +81,44 @@ local function handle_buffer_save(buf_nr)
 
     local msg = "Please select the resources to delete:\n"
 
-    vim.ui.select(choices, {
-      prompt = msg,
-      format_item = function(item)
-        if item == "all" then
-          return "Delete all following resources"
-        elseif item == "cancel" then
-          return "Cancel"
-        else
-          return string.format("Only delete %s: %s/%s", item.kind, item.metadata.namespace, item.metadata.name)
-        end
-      end,
-    }, function(choice)
-      log.debug("choice", choice)
+    vim.schedule(function()
+      vim.ui.select(choices, {
+        prompt = msg,
+        format_item = function(item)
+          if item == "all" then
+            return "Delete all following resources"
+          elseif item == "cancel" then
+            return "Cancel"
+          else
+            return string.format("Only delete %s: %s/%s", item.kind, item.metadata.namespace, item.metadata.name)
+          end
+        end,
+      }, function(choice)
+        log.debug("choice", choice)
 
-      if choice == "all" then
-        local remaining = #resources_to_delete
-        for _, resource in ipairs(resources_to_delete) do
-          delete_resource(resource, function()
-            remaining = remaining - 1
-            if remaining == 0 then
-              vim.schedule(function()
-                vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
-                buffer:load()
-              end)
+        if choice == "all" then
+          local remaining = #resources_to_delete
+          for _, resource in ipairs(resources_to_delete) do
+            delete_resource(resource, function()
+              remaining = remaining - 1
+              if remaining == 0 then
+                vim.schedule(function()
+                  vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
+                  buffer:load()
+                end)
+              end
+            end)
+          end
+        elseif choice == "cancel" then
+          vim.notify("Deletion cancelled")
+        elseif choice then
+          delete_resource(choice, function(result)
+            if result then
+              buffer:load()
             end
           end)
         end
-      elseif choice == "cancel" then
-        vim.notify("Deletion cancelled")
-      elseif choice then
-        delete_resource(choice, function(result)
-          if result then
-            buffer:load()
-          end
-        end)
-      end
+      end)
     end)
   end
 end
