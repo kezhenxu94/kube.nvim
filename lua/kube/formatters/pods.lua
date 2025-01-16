@@ -31,6 +31,8 @@ local M = {
 
       if status == "Running" and ready_count < container_count then
         highlight = "KubePending"
+      elseif status == "Failed" then
+        highlight = "KubeFailed"
       end
 
       local restarts = 0
@@ -41,24 +43,31 @@ local M = {
       end
 
       local diagnostics = {}
-      if not vim.tbl_contains(finished_statuses, status) and pod.status.conditions then
-        if #pod.status.conditions == 1 then
-          local condition = pod.status.conditions[1]
-          local message = condition.message or condition.reason
-          table.insert(diagnostics, {
-            message = string.format("The pod is not ready: %s", message),
-            severity = severity_map[status] or vim.diagnostic.severity.ERROR,
-          })
-        end
-        log.debug("pod.status.conditions", pod.status.conditions)
-        for _, condition in ipairs(pod.status.conditions) do
-          if condition.type == "Ready" and condition.status ~= "True" then
+      if not vim.tbl_contains(finished_statuses, status) then
+        if pod.status.conditions then
+          if #pod.status.conditions == 1 then
+            local condition = pod.status.conditions[1]
             local message = condition.message or condition.reason
             table.insert(diagnostics, {
               message = string.format("The pod is not ready: %s", message),
               severity = severity_map[status] or vim.diagnostic.severity.ERROR,
             })
           end
+          log.debug("pod.status.conditions", pod.status.conditions)
+          for _, condition in ipairs(pod.status.conditions) do
+            if condition.type == "Ready" and condition.status ~= "True" then
+              local message = condition.message or condition.reason
+              table.insert(diagnostics, {
+                message = string.format("The pod is not ready: %s", message),
+                severity = severity_map[status] or vim.diagnostic.severity.ERROR,
+              })
+            end
+          end
+        elseif pod.status then
+          table.insert(diagnostics, {
+            message = pod.status.message,
+            severity = severity_map[status] or vim.diagnostic.severity.ERROR,
+          })
         end
       end
 

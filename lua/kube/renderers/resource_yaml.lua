@@ -17,6 +17,8 @@ function M.load(buffer)
   vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
   vim.api.nvim_set_option_value("filetype", "yaml", { buf = self.buf_nr })
 
+  assert(resource_name, "resource_name is required")
+
   local job = require("kubectl").get_resource_yaml(resource_kind, resource_name, namespace, function(yaml)
     vim.schedule(function()
       if yaml then

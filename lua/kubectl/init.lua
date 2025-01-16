@@ -67,12 +67,6 @@ function M.get(resource_kind, name, namespace, params, callback)
   return kubectl(cmd, callback)
 end
 
----@param file_path string The path to the YAML file
----@param callback function Callback function to handle the output
-function M.apply(file_path, callback)
-  kubectl("apply -f " .. file_path, callback)
-end
-
 ---@param kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
@@ -230,7 +224,7 @@ end
 ---@param on_error fun(data: string|nil)|nil Callback function to handle the error output
 ---@return Job|nil The job object, or nil if the job is not started
 function M.apply(namespace, file_path, callback, on_error)
-  local job = kubectl("apply -f " .. file_path, function(result)
+  local job = kubectl(string.format("-n %s apply -f %s", namespace, file_path), function(result)
     if callback then
       callback(result)
     end
