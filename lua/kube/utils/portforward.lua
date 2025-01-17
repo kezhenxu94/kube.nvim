@@ -44,6 +44,12 @@ function M.prompt_port_forward(ports, kind, name, namespace)
           return
         end
 
+        local key = string.format("%s/%s", namespace, name)
+        if _G.portforwards[key] and _G.portforwards[key][local_port] then
+          vim.notify(string.format("Local port %d is already used", local_port), vim.log.levels.ERROR)
+          return
+        end
+
         log.debug("forwarding port", port.container, port.port, local_port)
 
         vim.notify(string.format("Forwarding port %d to %d", port.port, local_port), vim.log.levels.INFO)
