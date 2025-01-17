@@ -167,6 +167,18 @@ local M = {
       desc = "kube: edit the resource under the cursor",
     })
 
+    vim.keymap.set("n", config.keymaps.set_image, function()
+      local resource = resource_under_cursor()
+      if not resource then
+        return
+      end
+
+      actions[resource.kind:lower()].set_image(kbuf, resource, nil)
+    end, {
+      buffer = buf,
+      desc = "kube: set image for the resource under the cursor",
+    })
+
     vim.keymap.set("n", config.keymaps.refresh, function()
       local parts = {}
       if namespace then

@@ -14,12 +14,14 @@ local log = require("kube.log")
 ---@field describe fun(resource: table, parent: ParentResource|nil)|nil -- Describe the resource
 ---@field delete fun(resource: table, parent: ParentResource|nil)|nil -- Delete the resource
 ---@field edit fun(resource: table, parent: ParentResource|nil)|nil -- Edit the resource
+---@field set_image fun(resource: table, parent: ParentResource|nil)|nil -- Set the image for the resource
 
 local actions = {
   pod = require("kube.actions.pod"),
   container = require("kube.actions.container"),
   containers = require("kube.actions.container"),
   deployment = require("kube.actions.deployment"),
+  cronjob = require("kube.actions.cronjob"),
 }
 
 ---@type table<string, Actions>

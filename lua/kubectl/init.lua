@@ -233,4 +233,23 @@ function M.apply(namespace, file_path, callback, on_error)
   return job
 end
 
+---@param resource_kind string The kind of resource
+---@param name string The name of the resource
+---@param container string The name of the container
+---@param image string The new image to set
+---@param namespace string|nil The namespace of the resource, or nil to use default namespace
+---@param callback function|nil Callback function to handle the output
+---@param on_error fun(data: string|nil)|nil Callback function to handle the error output
+---@return Job|nil The job object, or nil if the job is not started
+function M.set_image(resource_kind, name, namespace, container, image, callback, on_error)
+  local cmd = string.format("set image %s/%s %s=%s", resource_kind, name, container, image)
+  if namespace then
+    cmd = cmd .. " -n " .. namespace
+  end
+
+  log.debug("kubectl.set_image", resource_kind, name, container, image, namespace, cmd)
+
+  return kubectl(cmd, callback, on_error)
+end
+
 return M

@@ -16,6 +16,7 @@ function M.defaults()
       forward_port = "gf",
       show_yaml = "gy",
       edit = "ge",
+      set_image = "gi",
     },
   }
 end
