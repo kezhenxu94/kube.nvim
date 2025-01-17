@@ -2,6 +2,8 @@
 
 Neovim Kubernetes plugin, manage your Kubernetes resources like a buffer!
 
+https://github.com/user-attachments/assets/822aa52d-f9ca-4208-bbfe-d2d95cfb90c5
+
 ## Installation
 
 To install kube.nvim, use the LazyVim plugin manager. Add the following to your configuration file:
