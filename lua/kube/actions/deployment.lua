@@ -55,6 +55,22 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
+  port_forward = function(resource, _)
+    log.debug("forwarding port for pod", resource)
+
+    local kind = resource.kind:lower()
+    local name = resource.metadata.name
+    local namespace = resource.metadata.namespace
+    local buf_name
+    if namespace then
+      buf_name = string.format("kube://namespaces/%s/%s/%s/portforward", namespace, kind, name)
+    else
+      buf_name = string.format("kube://%s/%s/portforward", kind, name)
+    end
+
+    vim.cmd.edit(buf_name)
+  end,
+
   forward_port = function(resource, parent)
     log.debug("forwarding port for deployment", resource, "in namespace", resource.metadata.namespace)
 
