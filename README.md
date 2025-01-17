@@ -35,6 +35,7 @@ See more details in [help file](./doc/kube-nvim.txt).
 - **Log Viewing**: View logs for your Kubernetes resources, and follow/tail the logs right inside Neovim buffer.
 - **Port Forwarding**: Forward ports for your Kubernetes resources.
 - **Diagnostics**: Publish diagnostics for unhealthy/unready/failed resources, navigate to problematic resources with `]d`.
+- **exec in to Pod container**: `exec` into Pod container right in Neovim. Select a Pod and press enter, then select a container and press enter!
 
 ## Contributing
 
