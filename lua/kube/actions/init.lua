@@ -25,6 +25,7 @@ local actions = {
   daemonset = require("kube.actions.daemonset"),
   statefulset = require("kube.actions.statefulset"),
   replicaset = require("kube.actions.replicaset"),
+  service = require("kube.actions.service"),
 }
 
 ---@type table<string, Actions>
