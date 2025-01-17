@@ -53,8 +53,16 @@ local formatters = {
     require("kube.formatters.cronjobs"),
   },
   {
-    { "daemonsets", "daemonset", "ds" },
+    { "daemonsets", "daemonset", "ds", "daemonsets.apps" },
     require("kube.formatters.daemonsets"),
+  },
+  {
+    { "statefulsets", "statefulset", "sts", "statefulsets.apps" },
+    require("kube.formatters.statefulsets"),
+  },
+  {
+    { "replicasets", "replicaset", "rs", "replicasets.apps" },
+    require("kube.formatters.replicasets"),
   },
 }
 

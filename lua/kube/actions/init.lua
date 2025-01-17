@@ -23,6 +23,8 @@ local actions = {
   deployment = require("kube.actions.deployment"),
   cronjob = require("kube.actions.cronjob"),
   daemonset = require("kube.actions.daemonset"),
+  statefulset = require("kube.actions.statefulset"),
+  replicaset = require("kube.actions.replicaset"),
 }
 
 ---@type table<string, Actions>
