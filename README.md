@@ -25,6 +25,8 @@ To use kube.nvim, you can run the following commands in Neovim:
 - `:Kube context`: Show available contexts and select to switch.
 - `:Kube context production`: Switch to the `production` context.
 
+See more details in [help file](./doc/kube-nvim.txt).
+
 ## Features
 
 - **Resource Management**: Manage resources like a buffer, delete a line and save to delete the resource.

@@ -1,4 +1,4 @@
-*kube.txt*	For use with Neovim
+*kube.nvim*	For use with Neovim
 *kube*
 
 ==============================================================================
