@@ -19,7 +19,7 @@ local M = {
     local follow = params.follow
     local container = params.container
 
-    local job = kubectl.logs(resource_name, container, namespace, follow, function(result)
+    local job = kubectl.logs(resource_kind, resource_name, container, namespace, follow, function(result)
       vim.schedule(function()
         if not result then
           return

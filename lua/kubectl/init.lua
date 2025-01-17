@@ -78,16 +78,17 @@ function M.get_resource_yaml(kind, name, namespace, callback)
   return kubectl(cmd, callback)
 end
 
+---@param resource_kind string The kind of resource
 ---@param resource_name string|nil The name of the resource
----@param container_name string|nil The name of the container, or nil to get logs from the first container
+---@param container_name string|nil The name of the container
 ---@param namespace string The namespace of the resource
 ---@param follow boolean|nil Whether to follow the logs (tail -f style)
 ---@param callback function Callback function to handle the output
 ---@return Job|nil The job object, or nil if the job is not started
-function M.logs(resource_name, container_name, namespace, follow, callback)
-  log.debug("kubectl.logs", resource_name, container_name, namespace, follow)
+function M.logs(resource_kind, resource_name, container_name, namespace, follow, callback)
+  log.debug("kubectl.logs", resource_kind, resource_name, container_name, namespace, follow)
 
-  local cmd = "logs " .. resource_name
+  local cmd = string.format("logs %s/%s", resource_kind, resource_name)
   if container_name then
     cmd = cmd .. " -c " .. container_name
   end

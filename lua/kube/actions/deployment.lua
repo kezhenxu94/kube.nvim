@@ -32,16 +32,11 @@ local M = {
   end,
 
   show_logs = function(resource, follow, parent)
-    if not parent then
-      log.error("parent resource is required")
-      return
-    end
+    log.debug("showing logs for deployment", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
-    log.debug("showing logs for container", resource.name, "in pod", parent.name)
-
-    local kind = parent.kind:lower()
-    local name = parent.name
-    local namespace = parent.namespace
+    local kind = resource.kind:lower()
+    local name = resource.metadata.name
+    local namespace = resource.metadata.namespace
     local buf_name
     local params = {}
 
@@ -50,8 +45,6 @@ local M = {
     else
       buf_name = string.format("kube://%s/%s/logs", kind, name)
     end
-
-    table.insert(params, "container=" .. resource.name)
 
     if follow then
       table.insert(params, "follow=true")
