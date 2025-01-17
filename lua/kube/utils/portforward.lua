@@ -14,7 +14,7 @@ function M.prompt_port_forward(ports, kind, name, namespace)
 
   local port_strings = {}
   for i, port in ipairs(ports) do
-    table.insert(port_strings, string.format("%d) %s: %d/%s", i, port.container, port.port, port.protocol))
+    table.insert(port_strings, string.format("%s: %d/%s", port.container, port.port, port.protocol))
   end
 
   local function prompt_port_forward()

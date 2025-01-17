@@ -15,7 +15,7 @@ function M.prompt_set_image(containers, kind, name, namespace, callback)
 
   local container_strings = {}
   for i, container in ipairs(containers) do
-    table.insert(container_strings, string.format("%d) %s: %s", i, container.name, container.image))
+    table.insert(container_strings, string.format("%s: %s", container.name, container.image))
   end
 
   vim.ui.select(container_strings, {

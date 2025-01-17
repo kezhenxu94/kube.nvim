@@ -52,6 +52,10 @@ local formatters = {
     { "cronjobs", "cronjob", "cronjobs.batch" },
     require("kube.formatters.cronjobs"),
   },
+  {
+    { "daemonsets", "daemonset", "ds" },
+    require("kube.formatters.daemonsets"),
+  },
 }
 
 ---@type table<string, Formatter>
