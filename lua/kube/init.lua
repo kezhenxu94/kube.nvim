@@ -68,7 +68,8 @@ function M.get(resource_kind, params)
   vim.cmd.edit(buf_name)
 end
 
-function M.delete(resource_kind, resource_name, namespace)
+function M.delete(resource_kind, resource_name, params)
+  local namespace = params.namespace or "default"
   vim.ui.select({ "Yes", "No" }, {
     prompt = string.format("Delete %s: %s/%s?", resource_kind, namespace, resource_name),
   }, function(choice)

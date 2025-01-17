@@ -41,6 +41,48 @@ local GetCommand = {
   end,
 }
 
+---@class DeleteCommand : CommandBase
+local DeleteCommand = {
+  ---@param args string[]
+  parse = function(args)
+    local kind = table.remove(args, 1)
+    local name = table.remove(args, 1)
+    local params = {}
+    for _, arg in ipairs(args) do
+      local key, value = arg:match("^(.+)=(.+)$")
+      if key then
+        params[key] = value
+      end
+    end
+    return { kind, name, params }
+  end,
+
+  complete = function(arglead, args)
+    if #args <= 1 then
+      -- Complete resource kinds
+      local kinds = require("kubectl").api_resources_sync()
+      if arglead and arglead ~= "" then
+        return vim.tbl_filter(function(kind)
+          return vim.startswith(kind:lower(), arglead:lower())
+        end, kinds)
+      end
+      return kinds
+    elseif #args == 2 then
+      -- TODO: Could add completion for resource names here
+      return {}
+    end
+
+    -- Parameter completion
+    local params = { "namespace", "selector" }
+    if arglead and arglead ~= "" then
+      return vim.tbl_filter(function(param)
+        return vim.startswith(param, arglead)
+      end, params)
+    end
+    return params
+  end,
+}
+
 ---@class ContextCommand : CommandBase
 local ContextCommand = {
   parse = function(args)
@@ -54,7 +96,7 @@ local ContextCommand = {
 
 M.command_handlers = {
   get = GetCommand,
-  delete = GetCommand,
+  delete = DeleteCommand,
   context = ContextCommand,
 }
 
@@ -99,8 +141,8 @@ M.commands = {
     require("kube").get(resource_kind, params)
   end,
 
-  delete = function(resource_kind, params)
-    require("kube").delete(resource_kind, params)
+  delete = function(resource_kind, name, params)
+    require("kube").delete(resource_kind, name, params)
   end,
 
   context = function(context)
