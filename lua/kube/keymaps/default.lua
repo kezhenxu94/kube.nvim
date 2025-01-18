@@ -173,7 +173,7 @@ local M = {
         return
       end
 
-      actions[resource.kind:lower()].set_image(kbuf, resource, nil)
+      actions[resource.kind:lower()].set_image(kbuf, resource)
     end, {
       buffer = buf,
       desc = "kube: set image for the resource under the cursor",
@@ -199,6 +199,23 @@ local M = {
     end, {
       buffer = buf,
       desc = "kube: refresh the resources in the buffer",
+    })
+
+    vim.keymap.set("n", config.keymaps.quit, function()
+      if vim.api.nvim_get_option_value("modified", { buf = buf }) then
+        require("kube.events.default").on_buf_saved(buf, function(saved)
+          if saved then
+            vim.schedule(function()
+              vim.api.nvim_buf_delete(buf, { force = true })
+            end)
+          end
+        end)
+      else
+        vim.api.nvim_buf_delete(buf, { force = true })
+      end
+    end, {
+      buffer = buf,
+      desc = "kube: quit the buffer",
     })
   end,
 }

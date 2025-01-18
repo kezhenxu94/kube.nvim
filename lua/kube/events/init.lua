@@ -1,6 +1,6 @@
 ---@class EventHandler
----@field on_buf_saved fun(buf_nr: number) Handle the buffer save event
----@field on_buf_deleted fun(buf_nr: number) Handle the buffer delete event
+---@field on_buf_saved fun(buf_nr: number, callback: fun(finished: boolean)|nil) Handle the buffer save event
+---@field on_buf_deleted fun(buf_nr: number, callback: fun(finished: boolean)|nil) Handle the buffer delete event
 
 local handlers = {
   portforward = require("kube.events.portforward"),

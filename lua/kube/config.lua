@@ -17,6 +17,7 @@ function M.defaults()
       show_yaml = "gy",
       edit = "ge",
       set_image = "gi",
+      quit = "q",
     },
   }
 end

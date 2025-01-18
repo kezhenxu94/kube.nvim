@@ -29,7 +29,9 @@ local function delete_resource(resource, callback)
   end)
 end
 
-local function handle_buffer_save(buf_nr)
+local function handle_buffer_save(buf_nr, callback)
+  callback = callback or function(saved) end
+
   local buffer = _G.kube_buffers[buf_nr]
   local marks_to_delete = {}
 
@@ -52,6 +54,7 @@ local function handle_buffer_save(buf_nr)
   end
 
   if #resources_to_delete == 0 then
+    callback(true)
     return
   end
 
@@ -65,11 +68,11 @@ local function handle_buffer_save(buf_nr)
         if choice == "Yes" then
           delete_resource(resource, function(result)
             if result then
-              buffer:load()
+              callback(true)
             end
           end)
         else
-          vim.notify("Deletion cancelled")
+          callback(false)
         end
       end)
     end)
@@ -104,17 +107,19 @@ local function handle_buffer_save(buf_nr)
               if remaining == 0 then
                 vim.schedule(function()
                   vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
-                  buffer:load()
                 end)
+                callback(true)
               end
             end)
           end
         elseif choice == "cancel" then
-          vim.notify("Deletion cancelled")
+          callback(false)
         elseif choice then
           delete_resource(choice, function(result)
             if result then
-              buffer:load()
+              callback(true)
+            else
+              callback(false)
             end
           end)
         end
@@ -123,7 +128,9 @@ local function handle_buffer_save(buf_nr)
   end
 end
 
-local function handle_buffer_delete(buf_nr)
+local function handle_buffer_delete(buf_nr, callback)
+  callback = callback or function(deleted) end
+
   local buf = _G.kube_buffers[buf_nr]
   log.debug("shutting down jobs")
 
@@ -136,6 +143,7 @@ local function handle_buffer_delete(buf_nr)
   end
 
   _G.kube_buffers[buf_nr] = nil
+  callback(true)
 end
 
 ---@type EventHandler

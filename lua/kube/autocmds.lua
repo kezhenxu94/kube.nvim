@@ -51,15 +51,22 @@ function M.setup()
       local subresource_kind = buffer.subresource_kind
       local handlers = require("kube.events")
 
+      local callback = function(saved)
+        if saved then
+          vim.schedule(function()
+            buffer:load()
+          end)
+        end
+      end
       if subresource_kind then
-        handlers[subresource_kind:lower()].on_buf_saved(buf_nr)
+        handlers[subresource_kind:lower()].on_buf_saved(buf_nr, callback)
       elseif resource_kind then
-        handlers[resource_kind:lower()].on_buf_saved(buf_nr)
+        handlers[resource_kind:lower()].on_buf_saved(buf_nr, callback)
       end
     end,
   })
 
-  autocmd({ "WinScrolled" }, {
+  autocmd({ "WinScrolled", "WinResized" }, {
     group = "kube_autocmds",
     callback = function()
       local buf_nr = vim.api.nvim_get_current_buf()
