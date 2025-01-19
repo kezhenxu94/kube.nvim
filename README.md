@@ -42,18 +42,18 @@ See more details in [help file](./doc/kube-nvim.txt).
 
 The following key mappings are available in kube.nvim:
 
-`<cr>`: Drill down into the resource under the cursor.
-`gd`: Describe the resource under the cursor.
-`gl`: Show logs for the resource under the cursor.
-`gL`: Follow logs for the resource under the cursor.
-`gF`: Show port forwards for the resource under the cursor.
-`gf`: Forward ports for the resource under the cursor.
-`gy`: Show YAML for the resource under the cursor.
-`ge`: Edit the resource under the cursor.
-`gE`: Exec into the resource under the cursor.
-`gi`: Set image for the resource under the cursor.
-`gr`: Refresh the resources in the buffer.
-`q`: Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
+- `<cr>`: Drill down into the resource under the cursor.
+- `gd`: Describe the resource under the cursor.
+- `gl`: Show logs for the resource under the cursor.
+- `gL`: Follow logs for the resource under the cursor.
+- `gF`: Show port forwards for the resource under the cursor.
+- `gf`: Forward ports for the resource under the cursor.
+- `gy`: Show YAML for the resource under the cursor.
+- `ge`: Edit the resource under the cursor.
+- `gE`: Exec into the resource under the cursor.
+- `gi`: Set image for the resource under the cursor.
+- `gr`: Refresh the resources in the buffer.
+- `q`: Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
 
 ## Configurations
 
