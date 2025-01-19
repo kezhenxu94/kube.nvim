@@ -15,6 +15,7 @@ local log = require("kube.log")
 ---@field delete fun(resource: table, parent: ParentResource|nil)|nil -- Delete the resource
 ---@field edit fun(resource: table, parent: ParentResource|nil)|nil -- Edit the resource
 ---@field set_image fun(resource: table, parent: ParentResource|nil)|nil -- Set the image for the resource
+---@field exec fun(resource: table, parent: ParentResource|nil)|nil -- `exec` into the resource
 
 local actions = {
   pod = require("kube.actions.pod"),

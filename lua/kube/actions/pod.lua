@@ -95,6 +95,15 @@ local M = {
       end
     end)
   end,
+
+  exec = function(resource, parent)
+    require("kube.utils.exec").prompt_exec(
+      resource.spec.containers,
+      resource.kind,
+      resource.metadata.name,
+      resource.metadata.namespace
+    )
+  end,
 }
 
 return M

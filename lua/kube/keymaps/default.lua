@@ -201,6 +201,26 @@ local M = {
       desc = "kube: refresh the resources in the buffer",
     })
 
+    vim.keymap.set("n", config.keymaps.exec, function()
+      local resource = resource_under_cursor()
+      if not resource then
+        return
+      end
+
+      if resource.kind then
+        actions[resource.kind:lower()].exec(resource)
+      elseif subresource_kind then
+        actions[subresource_kind:lower()].exec(resource, {
+          kind = kbuf.resource_kind,
+          name = kbuf.resource_name,
+          namespace = kbuf.namespace,
+        })
+      end
+    end, {
+      buffer = buf,
+      desc = "kube: exec into the resource under the cursor",
+    })
+
     vim.keymap.set("n", config.keymaps.quit, function()
       if vim.api.nvim_get_option_value("modified", { buf = buf }) then
         require("kube.events.default").on_buf_saved(buf, function(saved)

@@ -18,6 +18,7 @@ function M.defaults()
       edit = "ge",
       set_image = "gi",
       quit = "q",
+      exec = "gE",
     },
   }
 end

@@ -48,6 +48,10 @@ local M = {
     end
     require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
   end,
+
+  exec = function(resource, parent)
+    require("kube.utils.exec").prompt_exec({}, resource.kind, resource.metadata.name, resource.metadata.namespace)
+  end,
 }
 
 return M
