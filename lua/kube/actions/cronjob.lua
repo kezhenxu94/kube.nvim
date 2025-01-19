@@ -2,7 +2,7 @@ local log = require("kube.log")
 
 ---@type Actions
 local M = {
-  set_image = function(kbuf, resource, parent)
+  set_image = function(kbuf, resource, _)
     log.debug("setting image for cronjob", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()

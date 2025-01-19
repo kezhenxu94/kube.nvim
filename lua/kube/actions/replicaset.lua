@@ -2,16 +2,13 @@ local log = require("kube.log")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, parent)
+  drill_down_resource = function(resource, _)
     log.debug("drilling down to deployment", resource)
 
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
     local namespace = resource.metadata.namespace
     local selector = resource.spec.selector.matchLabels
 
     local buf_name
-    local params = {}
 
     if namespace then
       buf_name = string.format("kube://namespaces/%s/pods", namespace)
@@ -31,7 +28,7 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
-  set_image = function(kbuf, resource, parent)
+  set_image = function(kbuf, resource, _)
     log.debug("setting image for replicaset", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()

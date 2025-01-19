@@ -13,7 +13,7 @@ function M.prompt_port_forward(ports, kind, name, namespace)
   end
 
   local port_strings = {}
-  for i, port in ipairs(ports) do
+  for _, port in ipairs(ports) do
     table.insert(port_strings, string.format("%s: %d/%s", port.container, port.port, port.protocol))
   end
 
@@ -53,8 +53,7 @@ function M.prompt_port_forward(ports, kind, name, namespace)
         log.debug("forwarding port", port.container, port.port, local_port)
 
         vim.notify(string.format("Forwarding port %d to %d", port.port, local_port), vim.log.levels.INFO)
-        local job = require("kubectl").forward_port(kind, name, namespace, port.port, local_port, function(data)
-          local key = string.format("%s/%s", namespace, name)
+        local job = require("kubectl").forward_port(kind, name, namespace, port.port, local_port, function(_)
           _G.portforwards[key] = _G.portforwards[key] or {}
           _G.portforwards[key][local_port] = nil
         end, function(data)
@@ -66,7 +65,6 @@ function M.prompt_port_forward(ports, kind, name, namespace)
         end)
 
         if job then
-          local key = string.format("%s/%s", namespace, name)
           _G.portforwards[key] = _G.portforwards[key] or {}
           _G.portforwards[key][local_port] = {
             container_port = port.port,

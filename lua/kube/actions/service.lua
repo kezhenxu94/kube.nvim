@@ -2,16 +2,13 @@ local log = require("kube.log")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, parent)
+  drill_down_resource = function(resource, _)
     log.debug("drilling down to service", resource)
 
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
     local namespace = resource.metadata.namespace
     local selector = resource.spec.selector
 
     local buf_name
-    local params = {}
 
     if namespace then
       buf_name = string.format("kube://namespaces/%s/pods", namespace)
@@ -31,7 +28,7 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
-  forward_port = function(resource, parent)
+  forward_port = function(resource, _)
     log.debug("forwarding port for service", resource, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()
@@ -49,7 +46,7 @@ local M = {
     require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
   end,
 
-  exec = function(resource, parent)
+  exec = function(resource, _)
     require("kube.utils.exec").prompt_exec({}, resource.kind, resource.metadata.name, resource.metadata.namespace)
   end,
 }

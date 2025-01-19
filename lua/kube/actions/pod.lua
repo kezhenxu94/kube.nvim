@@ -75,7 +75,7 @@ local M = {
     require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
   end,
 
-  set_image = function(kbuf, resource, parent)
+  set_image = function(kbuf, resource, _)
     log.debug("setting image for pod", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()
@@ -96,7 +96,7 @@ local M = {
     end)
   end,
 
-  exec = function(resource, parent)
+  exec = function(resource, _)
     require("kube.utils.exec").prompt_exec(
       resource.spec.containers,
       resource.kind,

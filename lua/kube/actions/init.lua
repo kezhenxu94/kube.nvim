@@ -5,7 +5,7 @@ local log = require("kube.log")
 ---@field name string?
 ---@field namespace string?
 ---@class Actions
----@field drill_down_resource fun(resource: table, parent: ParentResource|nil) -- Drill down into the resource
+---@field drill_down_resource fun(resource: table, parent: ParentResource|nil)? -- Drill down into the resource
 ---@field show_yaml fun(resource: table, parent: ParentResource|nil)|nil -- Show the yaml buffer for the resource
 ---@field show_logs fun(resource: table, follow: boolean, parent: ParentResource|nil)|nil -- Show the logs buffer for the resource
 ---@field show_events fun(resource: table, parent: ParentResource|nil)|nil -- Show the events buffer for the resource
@@ -14,7 +14,7 @@ local log = require("kube.log")
 ---@field describe fun(resource: table, parent: ParentResource|nil)|nil -- Describe the resource
 ---@field delete fun(resource: table, parent: ParentResource|nil)|nil -- Delete the resource
 ---@field edit fun(resource: table, parent: ParentResource|nil)|nil -- Edit the resource
----@field set_image fun(resource: table, parent: ParentResource|nil)|nil -- Set the image for the resource
+---@field set_image fun(buffer: KubeBuffer, resource: table, parent: ParentResource|nil)|nil -- Set the image for the resource
 ---@field exec fun(resource: table, parent: ParentResource|nil)|nil -- `exec` into the resource
 
 local actions = {

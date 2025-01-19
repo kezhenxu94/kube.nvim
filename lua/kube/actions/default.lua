@@ -1,7 +1,5 @@
-local KubeBuffer = require("kube.buffer").KubeBuffer
-
 ---@param resource table
----@param params table
+---@param params table?
 local show_resource = function(resource, params)
   local kind = resource.kind
   local name = resource.metadata.name
@@ -27,28 +25,28 @@ end
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, parent)
+  drill_down_resource = function(resource, _)
     show_resource(resource, { output = "yaml" })
   end,
 
-  show_yaml = function(resource, parent)
+  show_yaml = function(resource, _)
     show_resource(resource, { output = "yaml" })
   end,
 
-  describe = function(resource, parent)
+  describe = function(resource, _)
     show_resource(resource, nil)
   end,
 
-  edit = function(resource, parent)
+  edit = function(resource, _)
     show_resource(resource, { output = "yaml", edit = true })
   end,
 
-  delete = function(resource, parent)
+  delete = function(resource, _)
     local kind = resource.kind
     local name = resource.metadata.name
     local namespace = resource.metadata.namespace
 
-    require("kubectl").delete(kind, name, namespace)
+    require("kubectl").delete(kind, name, namespace, nil, nil)
   end,
 
   ---@diagnostic disable-next-line: unused-local

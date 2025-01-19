@@ -2,16 +2,13 @@ local log = require("kube.log")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, parent)
+  drill_down_resource = function(resource, _)
     log.debug("drilling down to deployment", resource)
 
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
     local namespace = resource.metadata.namespace
     local selector = resource.spec.selector.matchLabels
 
     local buf_name
-    local params = {}
 
     if namespace then
       buf_name = string.format("kube://namespaces/%s/pods", namespace)
@@ -31,7 +28,7 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
-  show_logs = function(resource, follow, parent)
+  show_logs = function(resource, follow, _)
     log.debug("showing logs for deployment", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()
@@ -71,7 +68,7 @@ local M = {
     vim.cmd.edit(buf_name)
   end,
 
-  forward_port = function(resource, parent)
+  forward_port = function(resource, _)
     log.debug("forwarding port for deployment", resource, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()
@@ -91,7 +88,7 @@ local M = {
     require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
   end,
 
-  set_image = function(kbuf, resource, parent)
+  set_image = function(kbuf, resource, _)
     log.debug("setting image for deployment", resource.metadata.name, "in namespace", resource.metadata.namespace)
 
     local kind = resource.kind:lower()
@@ -112,7 +109,7 @@ local M = {
     end)
   end,
 
-  exec = function(resource, parent)
+  exec = function(resource, _)
     require("kube.utils.exec").prompt_exec(
       resource.spec.template.spec.containers,
       resource.kind,

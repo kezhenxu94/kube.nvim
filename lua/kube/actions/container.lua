@@ -22,7 +22,6 @@ local M = {
       log.error("parent resource is required")
       return
     end
-
     log.debug("showing logs for container", resource.name, "in pod", parent.name)
 
     local kind = parent.kind:lower()
@@ -49,11 +48,20 @@ local M = {
   end,
 
   forward_port = function(resource, parent)
+    if not parent then
+      log.error("parent resource is required")
+      return
+    end
     log.debug("forwarding port for container", resource, "in pod", parent.name)
 
     local kind = parent.kind:lower()
     local name = parent.name
     local namespace = parent.namespace
+
+    if not name or not namespace then
+      log.error("parent resource name and namespace are required")
+      return
+    end
 
     local ports = {}
     for _, port in ipairs(resource.ports or {}) do

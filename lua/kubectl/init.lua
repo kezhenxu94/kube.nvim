@@ -162,8 +162,8 @@ end
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string|nil The namespace of the resource, or nil to delete from default namespace
----@param callback function Callback function to handle the output
----@param on_error fun(data: string|nil) Callback function to handle the error output
+---@param callback fun(data: string?)? Callback function to handle the output
+---@param on_error fun(data: string?)? Callback function to handle the error output
 ---@return Job|nil The job object, or nil if the job is not started
 function M.delete(resource_kind, name, namespace, callback, on_error)
   log.debug("kubectl.delete", resource_kind, name, namespace)
@@ -172,7 +172,7 @@ function M.delete(resource_kind, name, namespace, callback, on_error)
   return kubectl(cmd, callback, on_error)
 end
 
----@return string The current context
+---@return string? The current context
 function M.get_current_context()
   local job = Job:new({
     command = "kubectl",
