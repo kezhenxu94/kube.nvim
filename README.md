@@ -23,6 +23,7 @@ To use kube.nvim, you can run the following commands in Neovim:
 
 - `:Kube get pods`: Get all pods in all namespaces.
 - `:Kube get deployments namespace=staging`: Get all deployments in the `staging` namespace.
+- `:Kube get pods selector=app=nginx,revision=v1`: Get all pods with the `app=nginx` and `revision=v1` label.
 - `:Kube delete pod test-pod`: Delete the pod named `test-pod`.
 - `:Kube context`: Show available contexts and select to switch.
 - `:Kube context production`: Switch to the `production` context.
