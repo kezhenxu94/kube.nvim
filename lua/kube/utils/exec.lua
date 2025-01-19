@@ -12,9 +12,9 @@ local function create_exec_terminal(namespace, resource_kind, resource_name, con
   local buf_name = string.format("kube://namespaces/%s/%s/%s", namespace, resource_kind:lower(), resource_name)
   if container_name then
     buf_name = buf_name .. "/" .. container_name
-  else
-    buf_name = buf_name .. "/exec"
   end
+  buf_name = buf_name .. "/exec"
+
   vim.api.nvim_buf_set_name(buf, buf_name)
 
   vim.api.nvim_set_option_value("modifiable", true, { buf = buf })
