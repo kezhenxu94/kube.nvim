@@ -26,7 +26,7 @@ local M = {
     vim.api.nvim_set_current_buf(buf)
 
     local cmd = string.format(
-      "kubectl exec -it -n %s %s -c %s -- bash || sh",
+      "kubectl exec -it -n %s %s -c %s -- sh -c 'command -v bash >/dev/null && exec bash || exec sh'",
       parent.namespace or "default",
       parent.name,
       resource.name
