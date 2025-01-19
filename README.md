@@ -21,12 +21,12 @@ To install kube.nvim, use the LazyVim plugin manager. Add the following to your 
 
 To use kube.nvim, you can run the following commands in Neovim:
 
-* ` -Kube get pods` - Get all pods in all namespaces.
-* ` -Kube get deployments namespace=staging` - Get all deployments in the `staging` namespace.
-* ` -Kube get pods selector=app=nginx,revision=v1` - Get all pods with the `app=nginx` and `revision=v1` label.
-* ` -Kube delete pod test-pod` - Delete the pod named `test-pod`.
-* ` -Kube context` - Show available contexts and select to switch.
-* ` -Kube context production` - Switch to the `production` context.
+* `:Kube get pods`: Get all pods in all namespaces.
+* `:Kube get deployments namespace=staging`: Get all deployments in the `staging` namespace.
+* `:Kube get pods selector=app=nginx,revision=v1`: Get all pods with the `app=nginx` and `revision=v1` label.
+* `:Kube delete pod test-pod`: Delete the pod named `test-pod`.
+* `:Kube context`: Show available contexts and select to switch.
+* `:Kube context production`: Switch to the `production` context.
 
 See more details in [help file](./doc/kube-nvim.txt).
 
@@ -59,25 +59,25 @@ The following key mappings are available in kube.nvim:
 
 The following configuration options are available in kube.nvim:
 
-* `keymaps` - A table of key mappings. The default values are:
-  * `drill_down` - `<cr>`
-  * `describe` - `gd`
-  * `refresh` - `gr`
-  * `show_logs` - `gl`
-  * `follow_logs` - `gL`
-  * `port_forward` - `gF`
-  * `forward_port` - `gf`
-  * `show_yaml` - `gy`
-  * `edit` - `ge`
-  * `set_image` - `gi`
-* `highlights` - A table of highlight groups. The default values are:
-  * `KubeBody` - `{ fg = "#40a02b" }`
-  * `KubePending` - `{ fg = "#fe640b" }`
-  * `KubeRunning` - `{ fg = "#40a02b" }`
-  * `KubeFailed` - `{ fg = "#d20f39" }`
-  * `KubeSucceeded` - `{ fg = "#9ca0b0" }`
-  * `KubeUnknown` - `{ fg = "#6c6f85" }`
-  * `KubeHeader` - `{ fg = "#df8e1d", bold = true }`
+- `keymaps`: A table of key mappings. The default values are:
+  - `drill_down`: `<cr>`
+  - `describe`: `gd`
+  - `refresh`: `gr`
+  - `show_logs`: `gl`
+  - `follow_logs`: `gL`
+  - `port_forward`: `gF`
+  - `forward_port`: `gf`
+  - `show_yaml`: `gy`
+  - `edit`: `ge`
+  - `set_image`: `gi`
+- `highlights`: A table of highlight groups. The default values are:
+  - `KubeBody`: `{ fg = "#40a02b" }`
+  - `KubePending`: `{ fg = "#fe640b" }`
+  - `KubeRunning`: `{ fg = "#40a02b" }`
+  - `KubeFailed`: `{ fg = "#d20f39" }`
+  - `KubeSucceeded`: `{ fg = "#9ca0b0" }`
+  - `KubeUnknown`: `{ fg = "#6c6f85" }`
+  - `KubeHeader`: `{ fg = "#df8e1d", bold = true }`
 
 ## Contributing
 
