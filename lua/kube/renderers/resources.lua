@@ -43,7 +43,10 @@ function M.load(buffer)
 
       local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
       buffer.header_row = header_row
-      vim.wo.winbar = utils.get_winbar(self.buf_nr)
+      local win_id = vim.fn.bufwinid(self.buf_nr)
+      if win_id ~= -1 then
+        vim.api.nvim_win_set_option(win_id, "winbar", utils.get_winbar(self.buf_nr))
+      end
 
       local lines = {}
       for _, row in ipairs(formatted_rows) do
