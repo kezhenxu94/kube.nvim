@@ -38,6 +38,47 @@ See more details in [help file](./doc/kube-nvim.txt).
 - **Diagnostics**: Publish diagnostics for unhealthy/unready/failed resources, navigate to problematic resources with `]d`.
 - **exec in to Pod container**: `exec` into Pod container right in Neovim. Select a Pod and press enter, then select a container and press enter!
 
+## Keymaps
+
+The following key mappings are available in kube.nvim:
+
+`<cr>`: Drill down into the resource under the cursor.
+`gd`: Describe the resource under the cursor.
+`gl`: Show logs for the resource under the cursor.
+`gL`: Follow logs for the resource under the cursor.
+`gF`: Show port forwards for the resource under the cursor.
+`gf`: Forward ports for the resource under the cursor.
+`gy`: Show YAML for the resource under the cursor.
+`ge`: Edit the resource under the cursor.
+`gE`: Exec into the resource under the cursor.
+`gi`: Set image for the resource under the cursor.
+`gr`: Refresh the resources in the buffer.
+`q`: Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
+
+## Configurations
+
+The following configuration options are available in kube.nvim:
+
+- `keymaps`: A table of key mappings. The default values are:
+  - `drill_down`: `<cr>`
+  - `describe`: `gd`
+  - `refresh`: `gr`
+  - `show_logs`: `gl`
+  - `follow_logs`: `gL`
+  - `port_forward`: `gF`
+  - `forward_port`: `gf`
+  - `show_yaml`: `gy`
+  - `edit`: `ge`
+  - `set_image`: `gi`
+- `highlights`: A table of highlight groups. The default values are:
+  - `KubeBody`: `{ fg = "#40a02b" }`
+  - `KubePending`: `{ fg = "#fe640b" }`
+  - `KubeRunning`: `{ fg = "#40a02b" }`
+  - `KubeFailed`: `{ fg = "#d20f39" }`
+  - `KubeSucceeded`: `{ fg = "#9ca0b0" }`
+  - `KubeUnknown`: `{ fg = "#6c6f85" }`
+  - `KubeHeader`: `{ fg = "#df8e1d", bold = true }`
+
 ## Contributing
 
 We welcome contributions to kube.nvim! If you would like to contribute, please follow these guidelines:
