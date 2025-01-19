@@ -90,6 +90,11 @@ local ContextCommand = {
   end,
 
   complete = function(arglead, args)
+    if arglead and arglead ~= "" then
+      return vim.tbl_filter(function(context)
+        return vim.startswith(context, arglead)
+      end, require("kubectl").context_names_sync())
+    end
     return require("kubectl").context_names_sync()
   end,
 }
@@ -137,16 +142,16 @@ function M.setup()
 end
 
 M.commands = {
-  get = function(resource_kind, params)
-    require("kube").get(resource_kind, params)
+  get = function(...)
+    require("kube").get(...)
   end,
 
-  delete = function(resource_kind, name, params)
-    require("kube").delete(resource_kind, name, params)
+  delete = function(...)
+    require("kube").delete(...)
   end,
 
-  context = function(context)
-    require("kube").ctx(context)
+  context = function(...)
+    require("kube").ctx(...)
   end,
 }
 
