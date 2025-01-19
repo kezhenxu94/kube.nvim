@@ -1,3 +1,4 @@
+local constants = require("kube.constants")
 local kubectl = require("kubectl")
 local log = require("kube.log")
 
@@ -30,7 +31,22 @@ local M = {
         vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
         local lines = vim.split(result, "\n")
         local start = vim.api.nvim_buf_line_count(self.buf_nr)
-        vim.api.nvim_buf_set_lines(self.buf_nr, start, -1, false, lines)
+        vim.api.nvim_buf_set_lines(self.buf_nr, follow and math.max(0, start - 1) or -1, -1, false, lines)
+
+        if follow then
+          vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "" })
+          vim.api.nvim_buf_set_extmark(
+            self.buf_nr,
+            constants.KUBE_NAMESPACE,
+            vim.api.nvim_buf_line_count(self.buf_nr) - 1,
+            0,
+            {
+              virt_text = { { "Waiting for new logs... (Ctrl+C to stop)", "Comment" } },
+              virt_text_pos = "overlay",
+            }
+          )
+        end
+
         vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
         vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
       end)
@@ -40,18 +56,29 @@ local M = {
       self.jobs[job.pid] = job
       log.debug("job", job.pid, "started")
 
-      vim.keymap.set("n", "<C-c>", function()
-        if self.jobs[job.pid] then
-          log.debug("killing job", job.pid)
-          vim.loop.kill(job.pid, vim.loop.constants.SIGTERM)
-          self.jobs[job.pid] = nil
+      if follow then
+        vim.keymap.set("n", "<C-c>", function()
+          if self.jobs[job.pid] then
+            log.debug("killing job", job.pid)
+            vim.loop.kill(job.pid, vim.loop.constants.SIGTERM)
+            self.jobs[job.pid] = nil
 
-          vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
-          vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "Stopped kubectl logs job" })
-          vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
-          vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
-        end
-      end, { buffer = self.buf_nr, desc = "Stop kubectl logs job" })
+            vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
+            vim.api.nvim_buf_set_extmark(
+              self.buf_nr,
+              constants.KUBE_NAMESPACE,
+              vim.api.nvim_buf_line_count(self.buf_nr) - 1,
+              0,
+              {
+                virt_text = { { "Stopped following logs, to restart, re-edit this buffer with `:e`", "Comment" } },
+                virt_text_pos = "overlay",
+              }
+            )
+            vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
+            vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
+          end
+        end, { buffer = self.buf_nr, desc = "Stop kubectl logs job" })
+      end
     end
   end,
 }
