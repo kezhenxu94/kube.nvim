@@ -40,66 +40,66 @@ USAGE                                              *kube.nvim-kube.nvim-usage*
 
 To use kube.nvim, you can run the following commands in Neovim:
 
-- `:Kube get pods`Get all pods in all namespaces.
-- `:Kube get deployments namespace=staging`Get all deployments in the `staging` namespace.
-- `:Kube get pods selector=app=nginx,revision=v1`Get all pods with the `app=nginx` and `revision=v1` label.
-- `:Kube delete pod test-pod`Delete the pod named `test-pod`.
-- `:Kube context`Show available contexts and select to switch.
-- `:Kube context production`Switch to the `production` context.
+- `-Kube get pods` - Get all pods in all namespaces.
+- `-Kube get deployments namespace=staging` - Get all deployments in the `staging` namespace.
+- `-Kube get pods selector=app=nginx,revision=v1` - Get all pods with the `app=nginx` and `revision=v1` label.
+- `-Kube delete pod test-pod` - Delete the pod named `test-pod`.
+- `-Kube context` - Show available contexts and select to switch.
+- `-Kube context production` - Switch to the `production` context.
 
 See more details in help file <./doc/kube-nvim.txt>.
 
 
 FEATURES                                        *kube.nvim-kube.nvim-features*
 
-- **Resource Management**Manage resources like a buffer, delete a line and save to delete the resource.
-- **Log Viewing**View logs for your Kubernetes resources, and follow/tail the logs right inside Neovim buffer.
-- **Port Forwarding**Forward ports for your Kubernetes resources.
-- **Diagnostics**Publish diagnostics for unhealthy/unready/failed resources, navigate to problematic resources with `]d`.
-- **exec in to Pod container**`exec` into Pod container right in Neovim. Select a Pod and press enter, then select a container and press enter!
+- **Resource Management** - Manage resources like a buffer, delete a line and save to delete the resource.
+- **Log Viewing** - View logs for your Kubernetes resources, and follow/tail the logs right inside Neovim buffer.
+- **Port Forwarding** - Forward ports for your Kubernetes resources.
+- **Diagnostics** - Publish diagnostics for unhealthy/unready/failed resources, navigate to problematic resources with `]d`.
+- **exec in to Pod container** - `exec` into Pod container right in Neovim. Select a Pod and press enter, then select a container and press enter!
 
 
 KEYMAPS                                          *kube.nvim-kube.nvim-keymaps*
 
 The following key mappings are available in kube.nvim:
 
-- `<cr>`Drill down into the resource under the cursor.
-- `gd`Describe the resource under the cursor.
-- `gl`Show logs for the resource under the cursor.
-- `gL`Follow logs for the resource under the cursor.
-- `gF`Show port forwards for the resource under the cursor.
-- `gf`Forward ports for the resource under the cursor.
-- `gy`Show YAML for the resource under the cursor.
-- `ge`Edit the resource under the cursor.
-- `gE`Exec into the resource under the cursor.
-- `gi`Set image for the resource under the cursor.
-- `gr`Refresh the resources in the buffer.
-- `q`Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
+- `<cr>` - Drill down into the resource under the cursor.
+- `gd` - Describe the resource under the cursor.
+- `gl` - Show logs for the resource under the cursor.
+- `gL` - Follow logs for the resource under the cursor.
+- `gF` - Show port forwards for the resource under the cursor.
+- `gf` - Forward ports for the resource under the cursor.
+- `gy` - Show YAML for the resource under the cursor.
+- `ge` - Edit the resource under the cursor.
+- `gE` - Exec into the resource under the cursor.
+- `gi` - Set image for the resource under the cursor.
+- `gr` - Refresh the resources in the buffer.
+- `q` - Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
 
 
 CONFIGURATIONS                            *kube.nvim-kube.nvim-configurations*
 
 The following configuration options are available in kube.nvim:
 
-- `keymaps`A table of key mappings. The default values are:
-    - `drill_down``<cr>`
-    - `describe``gd`
-    - `refresh``gr`
-    - `show_logs``gl`
-    - `follow_logs``gL`
-    - `port_forward``gF`
-    - `forward_port``gf`
-    - `show_yaml``gy`
-    - `edit``ge`
-    - `set_image``gi`
-- `highlights`A table of highlight groups. The default values are:
-    - `KubeBody``{ fg = "#40a02b" }`
-    - `KubePending``{ fg = "#fe640b" }`
-    - `KubeRunning``{ fg = "#40a02b" }`
-    - `KubeFailed``{ fg = "#d20f39" }`
-    - `KubeSucceeded``{ fg = "#9ca0b0" }`
-    - `KubeUnknown``{ fg = "#6c6f85" }`
-    - `KubeHeader``{ fg = "#df8e1d", bold = true }`
+- `keymaps` - A table of key mappings. The default values are:
+    - `drill_down` - `<cr>`
+    - `describe` - `gd`
+    - `refresh` - `gr`
+    - `show_logs` - `gl`
+    - `follow_logs` - `gL`
+    - `port_forward` - `gF`
+    - `forward_port` - `gf`
+    - `show_yaml` - `gy`
+    - `edit` - `ge`
+    - `set_image` - `gi`
+- `highlights` - A table of highlight groups. The default values are:
+    - `KubeBody` - `{ fg = "#40a02b" }`
+    - `KubePending` - `{ fg = "#fe640b" }`
+    - `KubeRunning` - `{ fg = "#40a02b" }`
+    - `KubeFailed` - `{ fg = "#d20f39" }`
+    - `KubeSucceeded` - `{ fg = "#9ca0b0" }`
+    - `KubeUnknown` - `{ fg = "#6c6f85" }`
+    - `KubeHeader` - `{ fg = "#df8e1d", bold = true }`
 
 
 CONTRIBUTING                                *kube.nvim-kube.nvim-contributing*
