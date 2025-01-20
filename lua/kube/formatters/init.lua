@@ -64,6 +64,10 @@ local formatters = {
     { "replicasets", "replicaset", "rs", "replicasets.apps" },
     require("kube.formatters.replicasets"),
   },
+  {
+    { "gateways", "gateway", "gw", "gateways.networking.istio.io" },
+    require("kube.formatters.gateways"),
+  },
 }
 
 ---@type table<string, Formatter>
