@@ -3,15 +3,54 @@ local log = require("kube.log")
 
 local M = {}
 
+_G.kube = _G.kube or {}
+
+local function get_state_file_path()
+  return vim.fn.stdpath("state") .. "/kube_state.json"
+end
+
+local function save_state()
+  local state_file = get_state_file_path()
+  local state = { context = _G.kube.context }
+  local json_str = vim.fn.json_encode(state)
+
+  local file = io.open(state_file, "w")
+  if file then
+    file:write(json_str)
+    file:close()
+  end
+end
+
+local function load_state()
+  local state_file = get_state_file_path()
+  local file = io.open(state_file, "r")
+  if file then
+    local json_str = file:read("*all")
+    file:close()
+
+    local ok, state = pcall(vim.fn.json_decode, json_str)
+    if ok and state and state.context then
+      _G.kube.context = state.context
+    end
+  end
+end
+
+load_state()
+
 ---@param cmd string The command to execute
 ---@param callback fun(data: string|nil)|nil Callback function to handle the output
 ---@param on_error fun(data: string|nil)|nil Callback function to handle the erroroutput
 local function kubectl(cmd, callback, on_error)
-  log.debug("kubectl.kubectl", cmd)
+  local args = vim.split(cmd, " ")
+  if _G.kube and _G.kube.context then
+    table.insert(args, 1, "--context")
+    table.insert(args, 2, _G.kube.context)
+  end
+  log.debug("kubectl.kubectl", args)
 
   local job = Job:new({
     command = "kubectl",
-    args = vim.split(cmd, " "),
+    args = args,
     on_exit = function(j, return_val)
       if not callback then
         return
@@ -88,7 +127,11 @@ end
 function M.logs(resource_kind, resource_name, container_name, namespace, follow, callback)
   log.debug("kubectl.logs", resource_kind, resource_name, container_name, namespace, follow)
 
-  local cmd = string.format("logs %s/%s", resource_kind, resource_name)
+  local cmd = "logs"
+  if _G.kube and _G.kube.context then
+    cmd = cmd .. " --context " .. _G.kube.context
+  end
+  cmd = cmd .. string.format(" %s/%s", resource_kind, resource_name)
   if container_name then
     cmd = cmd .. " -c " .. container_name
   end
@@ -174,6 +217,10 @@ end
 
 ---@return string? The current context
 function M.get_current_context()
+  if _G.kube and _G.kube.context then
+    return _G.kube.context
+  end
+
   local job = Job:new({
     command = "kubectl",
     args = { "config", "current-context" },
@@ -189,19 +236,25 @@ function M.get_config(callback)
   return kubectl("config view -o json", callback)
 end
 
----@param name string The name of the context to use
----@param callback function Callback function to handle the output
----@param on_error fun(data: string|nil) Callback function to handle the error output
----@return Job|nil The job object, or nil if the job is not started
 function M.use_context(name, callback, on_error)
-  return kubectl("config use-context " .. name, callback, on_error)
+  _G.kube.context = name
+  save_state()
+  callback(true)
 end
 
 ---@return string[] The list of API resources
 function M.api_resources_sync()
+  local args = {}
+  if _G.kube and _G.kube.context then
+    table.insert(args, "--context")
+    table.insert(args, _G.kube.context)
+  end
+  table.insert(args, "api-resources")
+  table.insert(args, "--output=name")
+
   local job = Job:new({
     command = "kubectl",
-    args = { "api-resources", "--output=name" },
+    args = args,
   })
   job:sync()
   local result = job:result()

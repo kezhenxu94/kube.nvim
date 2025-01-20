@@ -122,7 +122,7 @@ function M.ctx(context)
         return
       end
 
-      local current_context = config["current-context"]
+      local current_context = _G.kube.context or config["current-context"]
       vim.ui.select(contexts, {
         prompt = string.format("Select context (current: %s)", current_context),
         format_item = function(item)
