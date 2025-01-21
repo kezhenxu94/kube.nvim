@@ -162,7 +162,7 @@ function KubeBuffer:load()
     table.insert(parts, self.subresource_kind)
   end
 
-  vim.notify(string.format("Refreshing %s", table.concat(parts, "/")))
+  vim.notify(string.format("Loading %s", table.concat(parts, "/")))
   self.loading_job = require("kube.renderers").load(self)
 
   if self.loading_job then
