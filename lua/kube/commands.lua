@@ -89,7 +89,7 @@ local ContextCommand = {
     return { args[1] }
   end,
 
-  complete = function(arglead, args)
+  complete = function(arglead, _)
     if arglead and arglead ~= "" then
       return vim.tbl_filter(function(context)
         return vim.startswith(context, arglead)

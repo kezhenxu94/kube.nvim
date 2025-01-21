@@ -14,7 +14,7 @@ local M = {
 
     log.debug("loading describe buffer", resource_kind, resource_name, namespace)
 
-    kubectl.describe(resource_kind, resource_name, namespace, function(result)
+    return kubectl.describe(resource_kind, resource_name, namespace, function(result)
       vim.schedule(function()
         if not result then
           return

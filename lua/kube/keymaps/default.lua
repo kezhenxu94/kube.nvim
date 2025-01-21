@@ -180,21 +180,6 @@ local M = {
     })
 
     vim.keymap.set("n", config.keymaps.refresh, function()
-      local parts = {}
-      if namespace then
-        table.insert(parts, namespace)
-      end
-      if resource_kind then
-        table.insert(parts, resource_kind)
-      end
-      if kbuf.resource_name then
-        table.insert(parts, kbuf.resource_name)
-      end
-      if kbuf.subresource_kind then
-        table.insert(parts, kbuf.subresource_kind)
-      end
-      vim.notify(string.format("Refreshing %s", table.concat(parts, "/")))
-
       kbuf:load()
     end, {
       buffer = buf,

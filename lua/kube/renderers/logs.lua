@@ -79,7 +79,9 @@ local M = {
           end
         end, { buffer = self.buf_nr, desc = "Stop kubectl logs job" })
       end
+      return job
     end
+    return nil
   end,
 }
 

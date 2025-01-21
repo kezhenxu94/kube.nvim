@@ -24,15 +24,14 @@ function M.load(buffer)
   local headers = formatter.headers
   local kubectl = require("kubectl")
   local job = kubectl.get(resource_kind, resource_name, namespace, params, function(result)
+    if not result or result == "" then
+      log.debug("empty result", namespace, resource_kind, resource_name)
+      return
+    end
     vim.schedule(function()
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
       vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
       vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
-
-      if not result then
-        log.debug("empty result", namespace, resource_kind, resource_name)
-        return
-      end
 
       local data = vim.fn.json_decode(result)
       buffer.data = data
@@ -45,7 +44,7 @@ function M.load(buffer)
       buffer.header_row = header_row
       local win_id = vim.fn.bufwinid(self.buf_nr)
       if win_id ~= -1 then
-        vim.api.nvim_win_set_option(win_id, "winbar", utils.get_winbar(self.buf_nr))
+        vim.api.nvim_set_option_value("winbar", utils.get_winbar(self.buf_nr), { win = win_id })
       end
 
       local lines = {}
@@ -105,6 +104,8 @@ function M.load(buffer)
   if job then
     self.jobs[job.pid] = job
   end
+
+  return job
 end
 
 ---@class FormattedTableRow

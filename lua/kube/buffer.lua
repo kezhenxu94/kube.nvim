@@ -1,3 +1,5 @@
+---@diagnostic disable-next-line: unused-local
+local Job = require("plenary.job")
 local log = require("kube.log")
 local M = {}
 
@@ -24,6 +26,7 @@ _G.kube_buffers = {}
 ---@field subresource_name string|nil The name of the subresource in buffer
 ---@field params table<string, any>|nil The parameters of the resource in buffer
 ---@field jobs table<number, Job> The jobs running in the buffer
+---@field loading_job Job|nil The currently running loading job
 local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer
 
@@ -140,7 +143,33 @@ function KubeBuffer:setup()
 end
 
 function KubeBuffer:load()
-  require("kube.renderers").load(self)
+  if self.loading_job then
+    vim.notify("The buffer is currently being loaded", vim.log.levels.WARN)
+    return
+  end
+
+  local parts = {}
+  if self.namespace then
+    table.insert(parts, self.namespace)
+  end
+  if self.resource_kind then
+    table.insert(parts, self.resource_kind)
+  end
+  if self.resource_name then
+    table.insert(parts, self.resource_name)
+  end
+  if self.subresource_kind then
+    table.insert(parts, self.subresource_kind)
+  end
+
+  vim.notify(string.format("Refreshing %s", table.concat(parts, "/")))
+  self.loading_job = require("kube.renderers").load(self)
+
+  if self.loading_job then
+    self.loading_job:after(function()
+      self.loading_job = nil
+    end)
+  end
 end
 
 M.KubeBuffer = KubeBuffer

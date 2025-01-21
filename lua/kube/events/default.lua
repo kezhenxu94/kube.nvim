@@ -77,6 +77,7 @@ local function handle_buffer_save(buf_nr, callback)
       end)
     end)
   else
+    ---@type (table<string, any>|"cancel"|"all")[]
     local choices = { "cancel", "all" }
     for _, resource in ipairs(resources_to_delete) do
       table.insert(choices, resource)
@@ -115,6 +116,7 @@ local function handle_buffer_save(buf_nr, callback)
         elseif choice == "cancel" then
           callback(false)
         elseif choice then
+          assert(type(choice) == "table", "choice must be a table")
           delete_resource(choice, function(result)
             if result then
               callback(true)
@@ -129,12 +131,16 @@ local function handle_buffer_save(buf_nr, callback)
 end
 
 local function handle_buffer_delete(buf_nr, callback)
-  callback = callback or function(deleted) end
+  callback = callback or function(_) end
 
   local buf = _G.kube_buffers[buf_nr]
   log.debug("shutting down jobs")
 
   if buf then
+    if buf.loading_job then
+      vim.loop.kill(buf.loading_job.pid, vim.loop.constants.SIGTERM)
+      buf.loading_job = nil
+    end
     for job_id, _ in pairs(buf.jobs) do
       log.debug("shutting down job", job_id)
       vim.loop.kill(job_id, vim.loop.constants.SIGTERM)

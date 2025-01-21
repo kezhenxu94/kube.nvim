@@ -1,5 +1,8 @@
+---@diagnostic disable-next-line: unused-local
+local Job = require("plenary.job")
+
 ---@class Renderer
----@field load fun(buffer: KubeBuffer) Load content for the buffer
+---@field load fun(buffer: KubeBuffer): Job|nil Load content for the buffer
 
 local renderers = {
   logs = require("kube.renderers.logs"),
@@ -18,33 +21,30 @@ local M = {
     local params = self.params or {}
 
     if resource_kind and not resource_name then
-      renderers.resources.load(buffer)
-      return
+      return renderers.resources.load(buffer)
     end
 
     if resource_kind and resource_name and not subresource_kind then
       local output = params.output
       if not output then
-        renderers.resource.load(buffer)
+        return renderers.resource.load(buffer)
       elseif output == "yaml" then
-        renderers.resource_yaml.load(buffer)
+        return renderers.resource_yaml.load(buffer)
       else
         vim.notify("Unsupported output type: " .. output)
       end
-      return
+      return nil
     end
 
     if subresource_kind and renderers[subresource_kind] then
-      renderers[subresource_kind].load(buffer)
-      return
+      return renderers[subresource_kind].load(buffer)
     end
 
     if resource_kind and renderers[resource_kind] then
-      renderers[resource_kind].load(buffer)
-      return
+      return renderers[resource_kind].load(buffer)
     end
 
-    renderers.resources.load(buffer)
+    return renderers.resources.load(buffer)
   end,
 }
 
