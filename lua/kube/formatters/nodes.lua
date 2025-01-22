@@ -17,7 +17,7 @@ local M = {
       table.insert(rows, {
         row = {
           item.metadata.name,
-          table.concat(item.status.conditions[#item.status.conditions].type, ","),
+          item.status.conditions[#item.status.conditions].type,
           table.concat(roles, ","),
           utils.calculate_age(item.metadata.creationTimestamp),
           item.status.nodeInfo.kubeletVersion,
