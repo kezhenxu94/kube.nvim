@@ -2,6 +2,8 @@
 ---@field container_port number The container port to forward
 ---@field pid number The pid of the port forward
 
+vim.loop = vim.uv or vim.loop
+
 ---@type table<string, table<number, PortForward>> -- namespace/pod -> local port -> PortForward
 _G.portforwards = {}
 
@@ -20,14 +22,14 @@ function M.setup(opts)
     callback = function()
       for _, buffer in pairs(_G.kube_buffers or {}) do
         for pid, _ in pairs(buffer.jobs) do
-          vim.loop.kill(pid, vim.loop.constants.SIGTERM)
+          vim.loop.kill(pid, 15)
           buffer.jobs[pid] = nil
         end
       end
 
       for _, portforwards in pairs(_G.portforwards) do
         for _, portforward in pairs(portforwards) do
-          vim.loop.kill(portforward.pid, vim.loop.constants.SIGTERM)
+          vim.loop.kill(portforward.pid, 15)
         end
       end
     end,

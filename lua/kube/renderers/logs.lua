@@ -1,3 +1,5 @@
+---@diagnostic disable-next-line: unused-local
+local Job = require("plenary.job")
 local constants = require("kube.constants")
 local kubectl = require("kubectl")
 local log = require("kube.log")
@@ -60,7 +62,7 @@ local M = {
         vim.keymap.set("n", "<C-c>", function()
           if self.jobs[job.pid] then
             log.debug("killing job", job.pid)
-            vim.loop.kill(job.pid, vim.loop.constants.SIGTERM)
+            vim.loop.kill(job.pid, 15)
             self.jobs[job.pid] = nil
 
             vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })

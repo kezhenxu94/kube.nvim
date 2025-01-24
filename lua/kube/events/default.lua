@@ -138,12 +138,12 @@ local function handle_buffer_delete(buf_nr, callback)
 
   if buf then
     if buf.loading_job then
-      vim.loop.kill(buf.loading_job.pid, vim.loop.constants.SIGTERM)
+      vim.loop.kill(buf.loading_job.pid, 15)
       buf.loading_job = nil
     end
     for job_id, _ in pairs(buf.jobs) do
       log.debug("shutting down job", job_id)
-      vim.loop.kill(job_id, vim.loop.constants.SIGTERM)
+      vim.loop.kill(job_id, 15)
       buf.jobs[job_id] = nil
     end
   end

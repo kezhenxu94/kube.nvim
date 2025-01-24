@@ -36,7 +36,7 @@ local M = {
           prompt = msg,
         }, function(choice)
           if choice == "Yes" then
-            vim.loop.kill(portforward.portforward.pid, vim.loop.constants.SIGTERM)
+            vim.loop.kill(portforward.portforward.pid, 15)
             _G.portforwards[portforward.id] = nil
             buffer:load()
           end
@@ -64,14 +64,14 @@ local M = {
         }, function(choice)
           if choice == "all" then
             for _, portforward in ipairs(resources_to_delete) do
-              vim.loop.kill(portforward.portforward.pid, vim.loop.constants.SIGTERM)
+              vim.loop.kill(portforward.portforward.pid, 15)
               _G.portforwards[portforward.id][portforward.local_port] = nil
             end
             buffer:load()
           elseif choice == "cancel" then
             vim.notify("Deletion cancelled")
           elseif choice then
-            vim.loop.kill(choice.portforward.pid, vim.loop.constants.SIGTERM)
+            vim.loop.kill(choice.portforward.pid, 15)
             _G.portforwards[choice.id] = nil
             buffer:load()
           end
