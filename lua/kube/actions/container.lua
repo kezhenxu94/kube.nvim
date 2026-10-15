@@ -1,91 +1,50 @@
-local log = require("kube.log")
+local utils = require("kube.utils")
+
+---Container rows live in the `kube://context/<context>/namespaces/<ns>/pod/<name>/containers` buffer,
+---so the buffer itself identifies the parent pod.
+---@param kbuf KubeBuffer
+---@param container table The container spec
+local function exec(kbuf, container)
+  require("kube.utils.exec").prompt_exec(
+    kbuf.context,
+    { container },
+    kbuf.resource_kind,
+    kbuf.resource_name,
+    kbuf.namespace
+  )
+end
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, parent)
-    log.debug("drilling down to container", resource)
+  drill_down_resource = exec,
 
-    if not parent then
-      log.error("parent resource is required")
-      return
-    end
-    if not parent.name then
-      log.error("parent resource name is required")
-      return
-    end
-
-    require("kube.utils.exec").prompt_exec({ resource }, parent.kind, parent.name, parent.namespace)
+  show_logs = function(kbuf, container, follow)
+    utils.open({
+      context = kbuf.context,
+      namespace = kbuf.namespace,
+      kind = kbuf.resource_kind,
+      name = kbuf.resource_name,
+      subresource = "logs",
+      params = { container = container.name, follow = follow or nil },
+    })
   end,
 
-  show_logs = function(resource, follow, parent)
-    if not parent then
-      log.error("parent resource is required")
-      return
-    end
-    log.debug("showing logs for container", resource.name, "in pod", parent.name)
-
-    local kind = parent.kind:lower()
-    local name = parent.name
-    local namespace = parent.namespace
-    local buf_name
-    local params = {}
-
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/%s/%s/logs", namespace, kind, name)
-    else
-      buf_name = string.format("kube://%s/%s/logs", kind, name)
-    end
-
-    table.insert(params, "container=" .. resource.name)
-
-    if follow then
-      table.insert(params, "follow=true")
-    end
-
-    buf_name = buf_name .. "?" .. table.concat(params, "&")
-
-    vim.cmd.edit(buf_name)
-  end,
-
-  forward_port = function(resource, parent)
-    if not parent then
-      log.error("parent resource is required")
-      return
-    end
-    log.debug("forwarding port for container", resource, "in pod", parent.name)
-
-    local kind = parent.kind:lower()
-    local name = parent.name
-    local namespace = parent.namespace
-
-    if not name or not namespace then
-      log.error("parent resource name and namespace are required")
-      return
-    end
-
+  forward_port = function(kbuf, container)
     local ports = {}
-    for _, port in ipairs(resource.ports or {}) do
-      table.insert(ports, {
-        container = resource.name,
-        port = port.containerPort,
-        protocol = port.protocol or "TCP",
-      })
+    for _, port in ipairs(container.ports or {}) do
+      table.insert(ports, { container = container.name, port = port.containerPort, protocol = port.protocol or "TCP" })
     end
-    require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
+    require("kube.utils.portforward").prompt_port_forward(
+      kbuf.context,
+      ports,
+      -- Normalized from the loaded pod (e.g. `pods` -> `pod`) to match the port forward buffer's key
+      kbuf.data and utils.resource_type(kbuf.data) or kbuf.resource_kind,
+      kbuf.resource_name,
+      kbuf.namespace
+    )
   end,
 
-  exec = function(resource, parent)
-    if not parent then
-      log.error("parent resource is required")
-      return
-    end
-    if not parent.name then
-      log.error("parent resource name is required")
-      return
-    end
-
-    require("kube.utils.exec").prompt_exec({ resource }, parent.kind, parent.name, parent.namespace)
-  end,
+  exec = exec,
 }
 
 return M

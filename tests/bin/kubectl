@@ -1,0 +1,16 @@
+#!/bin/sh
+# Fake kubectl for tests: records the arguments and replies with the first rule
+# (shell glob on the arguments) registered via `require("helpers").respond`.
+printf '%s\n' "$*" >> "$KUBE_TEST_DIR/calls"
+
+if [ -f "$KUBE_TEST_DIR/rules" ]; then
+  while IFS='	' read -r pattern script; do
+    # shellcheck disable=SC2254
+    case "$*" in
+      $pattern) exec sh "$script" ;;
+    esac
+  done < "$KUBE_TEST_DIR/rules"
+fi
+
+echo "fake kubectl: no rule for: $*" >&2
+exit 1

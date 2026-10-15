@@ -1,6 +1,5 @@
 local kubectl = require("kubectl")
 local log = require("kube.log")
-local KubeBuffer = require("kube.buffer").KubeBuffer
 
 local M = {}
 
@@ -10,7 +9,6 @@ function M.load(buffer)
   local resource_kind = self.resource_kind
   local resource_name = self.resource_name
   local namespace = self.namespace
-  local params = self.params or {}
 
   log.debug("rendering yaml buffer", resource_kind, resource_name, namespace)
 
@@ -19,52 +17,23 @@ function M.load(buffer)
 
   assert(resource_name, "resource_name is required")
 
-  local job = require("kubectl").get_resource_yaml(resource_kind, resource_name, namespace, function(yaml)
-    vim.schedule(function()
-      if yaml then
-        vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, vim.split(yaml, "\n"))
-      else
-        vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, { "Failed to get resource YAML" })
-      end
+  local job = kubectl.get_resource_yaml(self.context, resource_kind, resource_name, namespace, function(yaml)
+    if not vim.api.nvim_buf_is_valid(self.buf_nr) then
+      return
+    end
 
-      vim.api.nvim_set_option_value("modifiable", params.edit == true, { buf = self.buf_nr })
-      vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
-    end)
+    if yaml then
+      vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, vim.split(yaml, "\n"))
+    else
+      vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, { "Failed to get resource YAML" })
+    end
+
+    vim.api.nvim_set_option_value("modifiable", yaml ~= nil, { buf = self.buf_nr })
+    vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
   end)
 
   if job then
-    local buf = KubeBuffer:new(self.buf_nr)
-    buf.jobs[job.pid] = job
-  end
-
-  if params.edit then
-    vim.api.nvim_create_autocmd("BufWriteCmd", {
-      buffer = self.buf_nr,
-      callback = function()
-        if vim.api.nvim_get_option_value("modified", { buf = self.buf_nr }) then
-          local lines = vim.api.nvim_buf_get_lines(self.buf_nr, 0, -1, false)
-          local temp_file = vim.fn.tempname()
-          vim.fn.writefile(lines, temp_file)
-          log.debug("applying resource", temp_file)
-
-          kubectl.apply(namespace, temp_file, function(result)
-            vim.schedule(function()
-              if result then
-                vim.notify("Resource updated successfully")
-                vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
-              else
-                vim.notify("Failed to update resource", vim.log.levels.ERROR)
-              end
-              vim.fn.delete(temp_file)
-            end)
-          end, function(data)
-            vim.schedule(function()
-              vim.notify("Failed to update resource: " .. data, vim.log.levels.ERROR)
-            end)
-          end)
-        end
-      end,
-    })
+    self.jobs[job.pid] = job
   end
 
   return job

@@ -1,53 +1,21 @@
-local log = require("kube.log")
+local helpers = require("kube.actions.helpers")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, _)
-    log.debug("drilling down to service", resource)
-
-    local namespace = resource.metadata.namespace
-    local selector = resource.spec.selector
-
-    local buf_name
-
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/pods", namespace)
-    else
-      buf_name = string.format("kube://pods")
-    end
-
-    local selector_params = {}
-    for key, value in pairs(selector) do
-      table.insert(selector_params, string.format("%s=%s", key, value))
-    end
-
-    if #selector_params > 0 then
-      buf_name = buf_name .. "?selector=" .. table.concat(selector_params, ",")
-    end
-
-    vim.cmd.edit(buf_name)
+  drill_down_resource = function(kbuf, resource)
+    helpers.open_pods(kbuf, resource.metadata.namespace, resource.spec.selector)
   end,
 
-  forward_port = function(resource, _)
-    log.debug("forwarding port for service", resource, "in namespace", resource.metadata.namespace)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-
+  forward_port = function(kbuf, resource)
     local ports = {}
     for _, port in ipairs(resource.spec.ports or {}) do
-      table.insert(ports, {
-        container = port.name,
-        port = port.port,
-        protocol = port.protocol or "TCP",
-      })
+      table.insert(ports, { name = port.name, ports = { { containerPort = port.port, protocol = port.protocol } } })
     end
-    require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
+    helpers.forward_port(kbuf, resource, ports)
   end,
 
-  exec = function(resource, _)
-    require("kube.utils.exec").prompt_exec({}, resource.kind, resource.metadata.name, resource.metadata.namespace)
+  exec = function(kbuf, resource)
+    helpers.exec(kbuf, resource, {})
   end,
 }
 

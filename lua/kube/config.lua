@@ -6,19 +6,22 @@ local M = {}
 ---@return KubeConfig
 function M.defaults()
   return {
+    -- Follows Neovim's conventions: LSP (gd, K, <C-]> via 'tagfunc') and the
+    -- built-in directory browser (<CR>, -, R)
     keymaps = {
       drill_down = "<cr>",
-      describe = "gd",
-      refresh = "gr",
+      show_yaml = "gd",
+      describe = "K",
+      parent = "-",
+      refresh = "R",
       show_logs = "gl",
       follow_logs = "gL",
       port_forward = "gF",
       forward_port = "gf",
-      show_yaml = "gy",
-      edit = "ge",
       set_image = "gi",
+      exec = "gs",
       quit = "q",
-      exec = "gE",
+      help = "g?",
     },
   }
 end

@@ -1,227 +1,106 @@
-local config = require("kube.config").values
 local actions = require("kube.actions")
 local constants = require("kube.constants")
 local log = require("kube.log")
 
+---@param kbuf KubeBuffer
+---@return table|nil The resource under the cursor
+local function resource_under_cursor(kbuf)
+  local row = vim.api.nvim_win_get_cursor(0)[1] - 1
+  local marks = vim.api.nvim_buf_get_extmarks(kbuf.buf_nr, constants.KUBE_NAMESPACE, { row, 0 }, { row, -1 }, {})
+  local marked_line = marks[1] and kbuf.mark_mappings[marks[1][1]]
+  log.debug("resource under cursor", marked_line)
+  return marked_line and marked_line.item
+end
+
+---Run the action for the resource under the cursor. Rows without a `kind`
+---(e.g. containers) are dispatched by the buffer's subresource kind.
+---@param kbuf KubeBuffer
+---@param action_name string
+---@param ... any Extra arguments for the action
+local function run_action(kbuf, action_name, ...)
+  local resource = resource_under_cursor(kbuf)
+  if not resource then
+    return
+  end
+
+  local kind = resource.kind or kbuf.subresource_kind
+  if not kind then
+    return
+  end
+
+  local action = actions[kind:lower()][action_name]
+  if not action then
+    vim.notify(string.format("%s is not supported for %s", action_name, kind), vim.log.levels.WARN)
+    return
+  end
+  action(kbuf, resource, ...)
+end
+
 ---@type Keymaps
 local M = {
   setup_buffer_keymaps = function(buf_nr)
+    local config = require("kube.config").values
     local kbuf = _G.kube_buffers[buf_nr]
-    local buf = kbuf.buf_nr
-    local resource_kind = kbuf.resource_kind
-    local namespace = kbuf.namespace
-    local mark_mappings = kbuf.mark_mappings
-    local subresource_kind = kbuf.subresource_kind
-    log.debug("resource_kind", resource_kind, "namespace", namespace, "subresource_kind", subresource_kind)
 
-    ---@type fun(): table<string, any>|nil
-    local resource_under_cursor = function()
-      local line = vim.api.nvim_win_get_cursor(0)[1]
-
-      local marks = vim.api.nvim_buf_get_extmarks(buf_nr, constants.KUBE_NAMESPACE, line, line, { details = true })
-      log.debug("marks", marks)
-
-      if #marks > 0 then
-        local mark_id = marks[1][1]
-        local resource = mark_mappings[mark_id].item
-        log.debug("resource under cursor", resource)
-        return resource
-      end
-
-      return nil
+    ---@param lhs string
+    ---@param desc string
+    ---@param fn function
+    local function map(lhs, desc, fn)
+      vim.keymap.set("n", lhs, fn, { buffer = buf_nr, desc = "kube: " .. desc })
     end
 
-    vim.keymap.set("n", config.keymaps.drill_down, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
+    ---@param lhs string
+    ---@param desc string
+    ---@param action_name string
+    ---@param ... any Extra arguments for the action
+    local function map_action(lhs, desc, action_name, ...)
+      local args = { ... }
+      map(lhs, desc, function()
+        run_action(kbuf, action_name, unpack(args))
+      end)
+    end
+
+    map_action(config.keymaps.drill_down, "drill down to the resource under the cursor", "drill_down_resource")
+    map_action(config.keymaps.show_logs, "show logs for the resource under the cursor", "show_logs", false)
+    map_action(config.keymaps.follow_logs, "follow logs for the resource under the cursor", "show_logs", true)
+    map_action(config.keymaps.port_forward, "show port forwards for the resource under the cursor", "port_forward")
+    map_action(config.keymaps.forward_port, "forward ports for the resource under the cursor", "forward_port")
+    map_action(config.keymaps.show_yaml, "go to the YAML definition of the resource, :w applies it", "show_yaml")
+    map_action(config.keymaps.describe, "describe the resource under the cursor", "describe")
+    map_action(config.keymaps.set_image, "set image for the resource under the cursor", "set_image")
+    map_action(config.keymaps.exec, "exec into the resource under the cursor", "exec")
+
+    vim.bo[buf_nr].tagfunc = "v:lua.require'kube.navigation'.tagfunc"
+
+    map(config.keymaps.parent, "go to the parent buffer", function()
+      local parent = require("kube.navigation").parent_name(kbuf)
+      if parent then
+        vim.cmd.edit(vim.fn.fnameescape(parent))
       end
+    end)
 
-      if resource.kind then
-        actions[resource.kind:lower()].drill_down_resource(resource)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].drill_down_resource(resource, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: drill down to the resource under the cursor",
-    })
+    map(config.keymaps.help, "show this help", function()
+      require("kube.help").show(buf_nr)
+    end)
 
-    vim.keymap.set("n", config.keymaps.show_logs, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      if resource.kind then
-        actions[resource.kind:lower()].show_logs(resource, false, nil)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].show_logs(resource, false, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: show logs for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.follow_logs, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      if resource.kind then
-        actions[resource.kind:lower()].show_logs(resource, true, nil)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].show_logs(resource, true, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: follow logs for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.port_forward, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      if resource.kind then
-        actions[resource.kind:lower()].port_forward(resource, nil)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].port_forward(resource, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: show port forwards for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.forward_port, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      if resource.kind then
-        actions[resource.kind:lower()].forward_port(resource, nil)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].forward_port(resource, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: forward ports for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.show_yaml, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      require("kube.actions.default").show_yaml(resource, nil)
-    end, {
-      buffer = buf,
-      desc = "kube: show YAML for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.describe, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      actions[resource.kind:lower()].describe(resource, nil)
-    end, {
-      buffer = buf,
-      desc = "kube: describe the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.edit, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      actions[resource.kind:lower()].edit(resource, nil)
-    end, {
-      buffer = buf,
-      desc = "kube: edit the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.set_image, function()
-      local resource = resource_under_cursor()
-      if not resource then
-        return
-      end
-
-      actions[resource.kind:lower()].set_image(kbuf, resource)
-    end, {
-      buffer = buf,
-      desc = "kube: set image for the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.refresh, function()
+    map(config.keymaps.refresh, "refresh the resources in the buffer", function()
       kbuf:load()
-    end, {
-      buffer = buf,
-      desc = "kube: refresh the resources in the buffer",
-    })
+    end)
 
-    vim.keymap.set("n", config.keymaps.exec, function()
-      local resource = resource_under_cursor()
-      if not resource then
+    map(config.keymaps.quit, "quit the buffer", function()
+      if not vim.api.nvim_get_option_value("modified", { buf = buf_nr }) then
+        vim.api.nvim_buf_delete(buf_nr, { force = true })
         return
       end
 
-      if resource.kind then
-        actions[resource.kind:lower()].exec(resource)
-      elseif subresource_kind then
-        actions[subresource_kind:lower()].exec(resource, {
-          kind = kbuf.resource_kind,
-          name = kbuf.resource_name,
-          namespace = kbuf.namespace,
-        })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: exec into the resource under the cursor",
-    })
-
-    vim.keymap.set("n", config.keymaps.quit, function()
-      if vim.api.nvim_get_option_value("modified", { buf = buf }) then
-        require("kube.events.default").on_buf_saved(buf, function(saved)
-          if saved then
-            vim.schedule(function()
-              vim.api.nvim_buf_delete(buf, { force = true })
-            end)
-          end
-        end)
-      else
-        vim.api.nvim_buf_delete(buf, { force = true })
-      end
-    end, {
-      buffer = buf,
-      desc = "kube: quit the buffer",
-    })
+      require("kube.events").for_buffer(kbuf).on_buf_saved(buf_nr, function(saved)
+        if saved then
+          vim.schedule(function()
+            vim.api.nvim_buf_delete(buf_nr, { force = true })
+          end)
+        end
+      end)
+    end)
   end,
 }
 

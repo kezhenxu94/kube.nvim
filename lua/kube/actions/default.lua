@@ -1,59 +1,22 @@
----@param resource table
----@param params table?
-local show_resource = function(resource, params)
-  local kind = resource.kind
-  local name = resource.metadata.name
-  local namespace = resource.metadata.namespace
-
-  local buf_name
-  if namespace then
-    buf_name = string.format("kube://namespaces/%s/%s/%s", namespace, kind:lower(), name)
-  else
-    buf_name = string.format("kube://%s/%s", string.lower(kind), name)
-  end
-
-  if params and next(params) then
-    local query_params = {}
-    for key, value in pairs(params) do
-      table.insert(query_params, key .. "=" .. tostring(value))
-    end
-    buf_name = buf_name .. "?" .. table.concat(query_params, "&")
-  end
-
-  vim.cmd.edit(buf_name)
-end
+local helpers = require("kube.actions.helpers")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource, _)
-    show_resource(resource, { output = "yaml" })
+  drill_down_resource = function(kbuf, resource)
+    helpers.open_resource(kbuf, resource, nil, { output = "yaml" })
   end,
 
-  show_yaml = function(resource, _)
-    show_resource(resource, { output = "yaml" })
+  show_yaml = function(kbuf, resource)
+    helpers.open_resource(kbuf, resource, nil, { output = "yaml" })
   end,
 
-  describe = function(resource, _)
-    show_resource(resource, nil)
-  end,
-
-  edit = function(resource, _)
-    show_resource(resource, { output = "yaml", edit = true })
-  end,
-
-  delete = function(resource, _)
-    local kind = resource.kind
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-
-    require("kubectl").delete(kind, name, namespace, nil, nil)
+  describe = function(kbuf, resource)
+    helpers.open_resource(kbuf, resource)
   end,
 
   ---@diagnostic disable-next-line: unused-local
-  show_logs = function(resource, follow, parent)
-    local kind = resource.kind
-
-    vim.notify(string.format("%s resources do not support logs", kind), vim.log.levels.WARN)
+  show_logs = function(kbuf, resource, follow)
+    vim.notify(string.format("%s resources do not support logs", resource.kind), vim.log.levels.WARN)
   end,
 }
 

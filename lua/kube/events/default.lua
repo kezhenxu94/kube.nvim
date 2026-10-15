@@ -1,31 +1,26 @@
 local constants = require("kube.constants")
 local log = require("kube.log")
+local utils = require("kube.utils")
 
+---@param resource table
+---@return string
+local function describe_target(resource)
+  return string.format("%s: %s/%s", utils.resource_type(resource), resource.metadata.namespace, resource.metadata.name)
+end
+
+---@param buffer KubeBuffer The buffer the resource belongs to
 ---@param resource table The resource to delete
 ---@param callback function The callback to call after deletion
-local function delete_resource(resource, callback)
+local function delete_resource(buffer, resource, callback)
   local kubectl = require("kubectl")
-  kubectl.delete(resource.kind, resource.metadata.name, resource.metadata.namespace, function(result)
+  local resource_type = utils.resource_type(resource)
+  kubectl.delete(buffer.context, resource_type, resource.metadata.name, resource.metadata.namespace, function(result)
     if result then
-      vim.schedule(function()
-        vim.notify(
-          string.format("Deleted %s: %s/%s", resource.kind, resource.metadata.namespace, resource.metadata.name)
-        )
-      end)
+      vim.notify("Deleted " .. describe_target(resource))
     end
     callback(result)
   end, function(data)
-    vim.schedule(function()
-      vim.notify(
-        string.format(
-          "Failed to delete %s: %s/%s: \n%s",
-          resource.kind,
-          resource.metadata.namespace,
-          resource.metadata.name,
-          data
-        )
-      )
-    end)
+    vim.notify(string.format("Failed to delete %s: \n%s", describe_target(resource), data), vim.log.levels.ERROR)
   end)
 end
 
@@ -60,13 +55,13 @@ local function handle_buffer_save(buf_nr, callback)
 
   if #resources_to_delete == 1 then
     local resource = resources_to_delete[1]
-    local msg = string.format("Delete %s: %s/%s?", resource.kind, resource.metadata.namespace, resource.metadata.name)
+    local msg = string.format("Delete %s (context: %s)?", describe_target(resource), buffer.context)
     vim.schedule(function()
       vim.ui.select({ "Yes", "No" }, {
         prompt = msg,
       }, function(choice)
         if choice == "Yes" then
-          delete_resource(resource, function(result)
+          delete_resource(buffer, resource, function(result)
             if result then
               callback(true)
             end
@@ -83,7 +78,7 @@ local function handle_buffer_save(buf_nr, callback)
       table.insert(choices, resource)
     end
 
-    local msg = "Please select the resources to delete:\n"
+    local msg = string.format("Please select the resources to delete (context: %s):\n", buffer.context)
 
     vim.schedule(function()
       vim.ui.select(choices, {
@@ -94,7 +89,7 @@ local function handle_buffer_save(buf_nr, callback)
           elseif item == "cancel" then
             return "Cancel"
           else
-            return string.format("Only delete %s: %s/%s", item.kind, item.metadata.namespace, item.metadata.name)
+            return "Only delete " .. describe_target(item)
           end
         end,
       }, function(choice)
@@ -103,7 +98,7 @@ local function handle_buffer_save(buf_nr, callback)
         if choice == "all" then
           local remaining = #resources_to_delete
           for _, resource in ipairs(resources_to_delete) do
-            delete_resource(resource, function()
+            delete_resource(buffer, resource, function()
               remaining = remaining - 1
               if remaining == 0 then
                 vim.schedule(function()
@@ -117,7 +112,7 @@ local function handle_buffer_save(buf_nr, callback)
           callback(false)
         elseif choice then
           assert(type(choice) == "table", "choice must be a table")
-          delete_resource(choice, function(result)
+          delete_resource(buffer, choice, function(result)
             if result then
               callback(true)
             else
@@ -137,14 +132,13 @@ local function handle_buffer_delete(buf_nr, callback)
   log.debug("shutting down jobs")
 
   if buf then
-    if buf.loading_job then
-      vim.loop.kill(buf.loading_job.pid, 15)
-      buf.loading_job = nil
-    end
-    for job_id, _ in pairs(buf.jobs) do
-      log.debug("shutting down job", job_id)
-      vim.loop.kill(job_id, 15)
-      buf.jobs[job_id] = nil
+    local kubectl = require("kubectl")
+    kubectl.kill(buf.loading_job)
+    buf.loading_job = nil
+    for pid, job in pairs(buf.jobs) do
+      log.debug("shutting down job", pid)
+      kubectl.kill(job)
+      buf.jobs[pid] = nil
     end
   end
 

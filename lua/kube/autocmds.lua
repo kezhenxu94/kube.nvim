@@ -17,11 +17,34 @@ function M.setup()
       local buf_name = vim.api.nvim_buf_get_name(buf_nr)
       log.debug("loading buffer", buf_name)
 
+      -- Without `context/<context>/` the buffer is for the current context, pin it so it
+      -- keeps operating on the same cluster after the context is switched.
+      if not vim.startswith(buf_name, "kube://context/") then
+        local context = require("kubectl").get_current_context()
+        if not context then
+          vim.notify("No current kubectl context", vim.log.levels.ERROR)
+          return
+        end
+
+        local rest = buf_name:sub(#"kube://" + 1):gsub("^/+", "")
+        local pinned_name = string.format("kube://context/%s/%s", vim.uri_encode(context, "rfc2396"), rest)
+        for _, other in ipairs(vim.api.nvim_list_bufs()) do
+          if vim.api.nvim_buf_get_name(other) == pinned_name then
+            vim.api.nvim_win_set_buf(0, other)
+            vim.schedule(function()
+              pcall(vim.api.nvim_buf_delete, buf_nr, { force = true })
+            end)
+            return
+          end
+        end
+        vim.api.nvim_buf_set_name(buf_nr, pinned_name)
+      end
+
       KubeBuffer:new(buf_nr):load()
     end,
   })
 
-  autocmd("BufDelete", {
+  autocmd({ "BufDelete", "BufWipeout" }, {
     group = "kube_autocmds",
     pattern = "kube://*",
     callback = function(ev)
@@ -47,22 +70,13 @@ function M.setup()
         return
       end
 
-      local resource_kind = buffer.resource_kind
-      local subresource_kind = buffer.subresource_kind
-      local handlers = require("kube.events")
-
-      local callback = function(saved)
+      require("kube.events").for_buffer(buffer).on_buf_saved(buf_nr, function(saved)
         if saved then
           vim.schedule(function()
             buffer:load()
           end)
         end
-      end
-      if subresource_kind then
-        handlers[subresource_kind:lower()].on_buf_saved(buf_nr, callback)
-      elseif resource_kind then
-        handlers[resource_kind:lower()].on_buf_saved(buf_nr, callback)
-      end
+      end)
     end,
   })
 

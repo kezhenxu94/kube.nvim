@@ -1,11 +1,11 @@
 ---@class Formatter
 ---@field headers string[] List of column headers
----@field format fun(data: table): FormattedRow[] Function that takes raw data and returns formatted rows
+---@field format fun(data: table, buffer: KubeBuffer): FormattedRow[] Function that takes raw data and returns formatted rows
 ---@field subresource_formatters table<string, Formatter[]>|nil Map of subresource name to formatter
 ---@class FormattedRow
 ---@field row table The row data containing column values
 ---@field item table The original resource item data
----@field diagnostics vim.diagnostic[]|nil List of diagnostics for the row
+---@field diagnostics vim.Diagnostic[]|nil List of diagnostics for the row
 
 local formatters = {
   {
@@ -13,7 +13,7 @@ local formatters = {
     require("kube.formatters.pods"),
   },
   {
-    { "deployments", "deployment", "deploy", "deployments.apps" },
+    { "deployments", "deployment", "deploy", "deployments.apps", "deployment.apps" },
     require("kube.formatters.deployments"),
   },
   {
@@ -29,7 +29,7 @@ local formatters = {
     require("kube.formatters.services"),
   },
   {
-    { "ingresses", "ingress", "ing" },
+    { "ingresses", "ingress", "ing", "ingresses.networking.k8s.io", "ingress.networking.k8s.io" },
     require("kube.formatters.ingresses"),
   },
   {
@@ -49,27 +49,28 @@ local formatters = {
     require("kube.formatters.portforward"),
   },
   {
-    { "cronjobs", "cronjob", "cronjobs.batch" },
+    { "cronjobs", "cronjob", "cronjobs.batch", "cronjob.batch" },
     require("kube.formatters.cronjobs"),
   },
   {
-    { "daemonsets", "daemonset", "ds", "daemonsets.apps" },
+    { "daemonsets", "daemonset", "ds", "daemonsets.apps", "daemonset.apps" },
     require("kube.formatters.daemonsets"),
   },
   {
-    { "statefulsets", "statefulset", "sts", "statefulsets.apps" },
+    { "statefulsets", "statefulset", "sts", "statefulsets.apps", "statefulset.apps" },
     require("kube.formatters.statefulsets"),
   },
   {
-    { "replicasets", "replicaset", "rs", "replicasets.apps" },
+    { "replicasets", "replicaset", "rs", "replicasets.apps", "replicaset.apps" },
     require("kube.formatters.replicasets"),
   },
   {
-    { "gateways", "gateway", "gw", "gateways.networking.istio.io" },
+    { "gateways", "gateway", "gw", "gateways.networking.istio.io", "gateway.networking.istio.io" },
     require("kube.formatters.gateways"),
   },
 }
 
+-- Aliases include the group-qualified singular from `utils.resource_type`, used by parent buffers
 ---@type table<string, Formatter>
 local M = {}
 

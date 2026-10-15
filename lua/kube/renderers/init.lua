@@ -1,8 +1,5 @@
----@diagnostic disable-next-line: unused-local
-local Job = require("plenary.job")
-
 ---@class Renderer
----@field load fun(buffer: KubeBuffer): Job|nil Load content for the buffer
+---@field load fun(buffer: KubeBuffer): vim.SystemObj|nil Load content for the buffer
 
 local renderers = {
   logs = require("kube.renderers.logs"),

@@ -12,7 +12,7 @@ local GetCommand = {
     local kind = table.remove(args, 1)
     local params = {}
     for _, arg in ipairs(args) do
-      local key, value = arg:match("^(.+)=(.+)$")
+      local key, value = arg:match("^([^=]+)=(.+)$")
       if key then
         params[key] = value
       end
@@ -49,7 +49,7 @@ local DeleteCommand = {
     local name = table.remove(args, 1)
     local params = {}
     for _, arg in ipairs(args) do
-      local key, value = arg:match("^(.+)=(.+)$")
+      local key, value = arg:match("^([^=]+)=(.+)$")
       if key then
         params[key] = value
       end

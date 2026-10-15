@@ -1,0 +1,12 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "networking.istio.io/v1",
+      "kind": "Gateway",
+      "metadata": { "name": "gw", "namespace": "istio-system", "creationTimestamp": "2026-01-01T00:00:00Z" },
+      "spec": { "servers": [{ "hosts": ["b.example.com", "a.example.com"] }, { "hosts": ["a.example.com"] }] }
+    }
+  ]
+}

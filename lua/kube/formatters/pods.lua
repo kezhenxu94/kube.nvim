@@ -63,7 +63,7 @@ local M = {
               })
             end
           end
-        elseif pod.status then
+        elseif pod.status.message then
           table.insert(diagnostics, {
             message = pod.status.message,
             severity = severity_map[status] or vim.diagnostic.severity.ERROR,

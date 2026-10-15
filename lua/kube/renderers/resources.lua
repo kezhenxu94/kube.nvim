@@ -5,6 +5,63 @@ local utils = require("kube.utils")
 
 local M = {}
 
+local MAX_COLUMN_WIDTH = 99
+local COLUMN_SEPARATOR = "  "
+
+---Identity of a row's item that survives reloads, so the cursor can stay on the same row.
+---@param item table|nil
+---@return string|nil
+local function row_identity(item)
+  if type(item) ~= "table" then
+    return nil
+  end
+  if item.metadata then
+    return table.concat({ item.kind or "", item.metadata.namespace or "", item.metadata.name or "" }, "/")
+  end
+  if item.local_port then
+    return string.format("%s:%s", item.id, item.local_port)
+  end
+  return item.name
+end
+
+---Remember the row under the cursor of every window showing the buffer.
+---@param buffer KubeBuffer
+---@return {win: integer, identity: string|nil, cursor: integer[]}[]
+local function save_cursors(buffer)
+  local saved = {}
+  for _, win in ipairs(vim.fn.win_findbuf(buffer.buf_nr)) do
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    local marks = vim.api.nvim_buf_get_extmarks(
+      buffer.buf_nr,
+      constants.KUBE_NAMESPACE,
+      { cursor[1] - 1, 0 },
+      { cursor[1] - 1, -1 },
+      {}
+    )
+    local marked_line = marks[1] and buffer.mark_mappings[marks[1][1]]
+    table.insert(saved, { win = win, identity = marked_line and row_identity(marked_line.item), cursor = cursor })
+  end
+  return saved
+end
+
+---Move the cursors back to the rows of the same items, or keep the line when the item is gone.
+---@param saved {win: integer, identity: string|nil, cursor: integer[]}[]
+---@param formatted_rows FormattedTableRow[]
+local function restore_cursors(saved, formatted_rows)
+  for _, entry in ipairs(saved) do
+    if vim.api.nvim_win_is_valid(entry.win) then
+      local line = math.min(entry.cursor[1], math.max(#formatted_rows, 1))
+      for row_num, row in ipairs(formatted_rows) do
+        if entry.identity and row_identity(row.raw) == entry.identity then
+          line = row_num
+          break
+        end
+      end
+      pcall(vim.api.nvim_win_set_cursor, entry.win, { line, entry.cursor[2] })
+    end
+  end
+end
+
 ---@param buffer KubeBuffer The buffer to render into
 function M.load(buffer)
   local self = buffer
@@ -23,82 +80,90 @@ function M.load(buffer)
 
   local headers = formatter.headers
   local kubectl = require("kubectl")
-  local job = kubectl.get(resource_kind, resource_name, namespace, params, function(result)
+  local job = kubectl.get(self.context, resource_kind, resource_name, namespace, params, function(result)
     if not result or result == "" then
       log.debug("empty result", namespace, resource_kind, resource_name)
       return
     end
-    vim.schedule(function()
-      vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
-      vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
-      vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
+    if not vim.api.nvim_buf_is_valid(self.buf_nr) then
+      return
+    end
 
-      local data = vim.fn.json_decode(result)
-      buffer.data = data
+    local cursors = save_cursors(self)
 
-      local rows = formatter.format(data)
+    vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
+    vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
+    vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
+    self.mark_mappings = {}
+    self.mark_columns = {}
 
-      self:setup()
+    local data = vim.json.decode(result)
+    buffer.data = data
 
-      local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
-      buffer.header_row = header_row
-      local win_id = vim.fn.bufwinid(self.buf_nr)
-      if win_id ~= -1 then
-        vim.api.nvim_set_option_value("winbar", utils.get_winbar(self.buf_nr), { win = win_id })
+    local rows = formatter.format(data, self)
+
+    self:setup()
+
+    local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
+    buffer.header_row = header_row
+    local win_id = vim.fn.bufwinid(self.buf_nr)
+    if win_id ~= -1 then
+      vim.api.nvim_set_option_value("winbar", utils.get_winbar(self.buf_nr), { win = win_id })
+    end
+
+    local lines = {}
+    for _, row in ipairs(formatted_rows) do
+      table.insert(lines, row.formatted)
+    end
+    vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
+    restore_cursors(cursors, formatted_rows)
+
+    local diagnostics = {}
+    for row_num, row in ipairs(formatted_rows) do
+      if row.raw then
+        local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+          invalidate = true,
+          line_hl_group = row.highlight or "KubeBody",
+        })
+        self.mark_mappings[mark_id] = {
+          item = row.raw,
+        }
       end
 
-      local lines = {}
-      for _, row in ipairs(formatted_rows) do
-        table.insert(lines, row.formatted)
-      end
-      vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
-
-      local diagnostics = {}
-      for row_num, row in ipairs(formatted_rows) do
-        if row.raw then
-          local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+      local col_pos = 0
+      for i, col_width in ipairs(col_widths) do
+        -- Same widths and separator as `align_row`
+        local width = math.min(MAX_COLUMN_WIDTH, col_width)
+        local mark_id =
+          vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
+            end_col = col_pos + width,
             invalidate = true,
-            line_hl_group = row.highlight or "KubeBody",
           })
-          self.mark_mappings[mark_id] = {
-            item = row.raw,
-          }
-        end
-
-        local col_pos = 0
-        for i, col_width in ipairs(col_widths) do
-          local mark_id =
-            vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
-              end_col = col_pos + col_width,
-              invalidate = true,
-            })
-          log.debug("mark_id", mark_id, "col_pos", col_pos, "col_width", col_width)
-          self.mark_columns[mark_id] = {
-            item = row.raw,
-            column = headers[i],
-          }
-          col_pos = col_pos + col_width
-        end
-
-        if row.diagnostics then
-          for _, diagnostic in ipairs(row.diagnostics) do
-            table.insert(diagnostics, {
-              bufnr = self.buf_nr,
-              lnum = row_num - 1,
-              col = 0,
-              message = diagnostic.message,
-              severity = diagnostic.severity,
-            })
-          end
-        end
+        self.mark_columns[mark_id] = {
+          item = row.raw,
+          column = headers[i],
+        }
+        col_pos = col_pos + width + #COLUMN_SEPARATOR
       end
 
-      if #diagnostics > 0 then
-        vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, buffer.buf_nr, diagnostics, {})
+      if row.diagnostics then
+        for _, diagnostic in ipairs(row.diagnostics) do
+          table.insert(diagnostics, {
+            bufnr = self.buf_nr,
+            lnum = row_num - 1,
+            col = 0,
+            message = diagnostic.message,
+            severity = diagnostic.severity,
+          })
+        end
       end
+    end
 
-      vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
-    end)
+    if #diagnostics > 0 then
+      vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, buffer.buf_nr, diagnostics, {})
+    end
+
+    vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
   end)
 
   if job then
@@ -155,7 +220,7 @@ function M.align_row(row, col_widths)
   local formatted_cols = {}
   for i, col in ipairs(row) do
     if i <= #col_widths then
-      local width = math.min(99, col_widths[i])
+      local width = math.min(MAX_COLUMN_WIDTH, col_widths[i])
       local col_str = col or ""
       if #col_str > width then
         col_str = col_str:sub(1, width - 3) .. "..."
@@ -163,7 +228,7 @@ function M.align_row(row, col_widths)
       table.insert(formatted_cols, string.format("%-" .. width .. "s", col_str))
     end
   end
-  return table.concat(formatted_cols, "  ")
+  return table.concat(formatted_cols, COLUMN_SEPARATOR)
 end
 
 return M

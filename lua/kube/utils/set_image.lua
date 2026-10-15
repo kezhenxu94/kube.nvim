@@ -2,12 +2,13 @@ local log = require("kube.log")
 
 local M = {}
 
+---@param context string The kubectl context
 ---@param containers table[] List of container configurations
 ---@param kind string Resource kind
 ---@param name string Resource name
 ---@param namespace string Resource namespace
 ---@param callback fun(changed: boolean)
-function M.prompt_set_image(containers, kind, name, namespace, callback)
+function M.prompt_set_image(context, containers, kind, name, namespace, callback)
   if #containers == 0 then
     vim.notify("No containers available", vim.log.levels.WARN)
     return
@@ -41,7 +42,7 @@ function M.prompt_set_image(containers, kind, name, namespace, callback)
 
       log.debug("setting image for container", container.name, "to", input)
 
-      require("kubectl").set_image(kind, name, namespace, container.name, input, function(success)
+      require("kubectl").set_image(context, kind, name, namespace, container.name, input, function(success)
         if success then
           vim.notify(
             string.format("Successfully updated image for container '%s' to '%s'", container.name, input),
@@ -52,12 +53,7 @@ function M.prompt_set_image(containers, kind, name, namespace, callback)
           callback(false)
         end
       end, function(err)
-        if err then
-          vim.schedule(function()
-            vim.notify(err, vim.log.levels.ERROR)
-          end)
-          callback(false)
-        end
+        vim.notify(err, vim.log.levels.ERROR)
       end)
     end)
   end)

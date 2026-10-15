@@ -12,7 +12,7 @@ local M = {
       for _, server in ipairs(item.spec.servers) do
         table.insert(hosts, server.hosts)
       end
-      hosts = vim.tbl_flatten(hosts)
+      hosts = vim.iter(hosts):flatten():totable()
       hosts = vim.fn.uniq(vim.fn.sort(hosts))
       table.insert(rows, {
         row = {

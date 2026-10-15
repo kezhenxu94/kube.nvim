@@ -1,7 +1,9 @@
 local constants = require("kube.constants")
+local kubectl = require("kubectl")
 local log = require("kube.log")
 local M = {
-  on_buf_saved = function(buf_nr)
+  on_buf_saved = function(buf_nr, callback)
+    callback = callback or function(_) end
     local buffer = _G.kube_buffers[buf_nr]
     local marks_to_delete = {}
 
@@ -23,6 +25,7 @@ local M = {
     end
 
     if #resources_to_delete == 0 then
+      callback(true)
       return
     end
 
@@ -36,9 +39,11 @@ local M = {
           prompt = msg,
         }, function(choice)
           if choice == "Yes" then
-            vim.loop.kill(portforward.portforward.pid, 15)
-            _G.portforwards[portforward.id] = nil
-            buffer:load()
+            kubectl.kill(portforward.portforward.job)
+            _G.portforwards[portforward.id][portforward.local_port] = nil
+            callback(true)
+          else
+            callback(false)
           end
         end)
       end)
@@ -64,16 +69,17 @@ local M = {
         }, function(choice)
           if choice == "all" then
             for _, portforward in ipairs(resources_to_delete) do
-              vim.loop.kill(portforward.portforward.pid, 15)
+              kubectl.kill(portforward.portforward.job)
               _G.portforwards[portforward.id][portforward.local_port] = nil
             end
-            buffer:load()
+            callback(true)
           elseif choice == "cancel" then
             vim.notify("Deletion cancelled")
+            callback(false)
           elseif choice then
-            vim.loop.kill(choice.portforward.pid, 15)
-            _G.portforwards[choice.id] = nil
-            buffer:load()
+            kubectl.kill(choice.portforward.job)
+            _G.portforwards[choice.id][choice.local_port] = nil
+            callback(true)
           end
         end)
       end)

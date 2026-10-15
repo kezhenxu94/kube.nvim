@@ -1,108 +1,29 @@
-local log = require("kube.log")
+local helpers = require("kube.actions.helpers")
 
 ---@type Actions
 local M = {
-  drill_down_resource = function(resource)
-    log.debug("drilling down to pod", resource)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-    local buf_name
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/%s/%s/containers", namespace, kind, name)
-    else
-      buf_name = string.format("kube://%s/%s/containers", kind, name)
-    end
-
-    vim.cmd.edit(buf_name)
+  drill_down_resource = function(kbuf, resource)
+    helpers.open_resource(kbuf, resource, "containers")
   end,
 
-  show_logs = function(resource, follow, _)
-    log.debug("showing logs for pod", resource)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-    local buf_name
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/%s/%s/logs", namespace, kind, name)
-    else
-      buf_name = string.format("kube://%s/%s/logs", kind, name)
-    end
-
-    if follow then
-      buf_name = buf_name .. "?follow=true"
-    end
-
-    vim.cmd.edit(buf_name)
+  show_logs = function(kbuf, resource, follow)
+    helpers.open_resource(kbuf, resource, "logs", follow and { follow = true } or nil)
   end,
 
-  port_forward = function(resource, _)
-    log.debug("forwarding port for pod", resource)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-    local buf_name
-    if namespace then
-      buf_name = string.format("kube://namespaces/%s/%s/%s/portforward", namespace, kind, name)
-    else
-      buf_name = string.format("kube://%s/%s/portforward", kind, name)
-    end
-
-    vim.cmd.edit(buf_name)
+  port_forward = function(kbuf, resource)
+    helpers.open_resource(kbuf, resource, "portforward")
   end,
 
-  forward_port = function(resource, _)
-    log.debug("forwarding port for pod", resource)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-
-    local ports = {}
-    for _, container in ipairs(resource.spec.containers) do
-      for _, port in ipairs(container.ports or {}) do
-        table.insert(ports, {
-          container = container.name,
-          port = port.containerPort,
-          protocol = port.protocol or "TCP",
-        })
-      end
-    end
-
-    require("kube.utils.portforward").prompt_port_forward(ports, kind, name, namespace)
+  forward_port = function(kbuf, resource)
+    helpers.forward_port(kbuf, resource, resource.spec.containers)
   end,
 
-  set_image = function(kbuf, resource, _)
-    log.debug("setting image for pod", resource.metadata.name, "in namespace", resource.metadata.namespace)
-
-    local kind = resource.kind:lower()
-    local name = resource.metadata.name
-    local namespace = resource.metadata.namespace
-
-    local containers = {}
-    for _, container in ipairs(resource.spec.containers) do
-      table.insert(containers, {
-        name = container.name,
-        image = container.image,
-      })
-    end
-    require("kube.utils.set_image").prompt_set_image(containers, kind, name, namespace, function(changed)
-      if changed then
-        kbuf:load()
-      end
-    end)
+  set_image = function(kbuf, resource)
+    helpers.set_image(kbuf, resource, resource.spec.containers)
   end,
 
-  exec = function(resource, _)
-    require("kube.utils.exec").prompt_exec(
-      resource.spec.containers,
-      resource.kind,
-      resource.metadata.name,
-      resource.metadata.namespace
-    )
+  exec = function(kbuf, resource)
+    helpers.exec(kbuf, resource, resource.spec.containers)
   end,
 }
 

@@ -1,4 +1,3 @@
-local Job = require("plenary.job")
 local log = require("kube.log")
 
 local M = {}
@@ -12,7 +11,7 @@ end
 local function save_state()
   local state_file = get_state_file_path()
   local state = { context = _G.kube.context }
-  local json_str = vim.fn.json_encode(state)
+  local json_str = vim.json.encode(state)
 
   local file = io.open(state_file, "w")
   if file then
@@ -28,8 +27,8 @@ local function load_state()
     local json_str = file:read("*all")
     file:close()
 
-    local ok, state = pcall(vim.fn.json_decode, json_str)
-    if ok and state and state.context then
+    local ok, state = pcall(vim.json.decode, json_str)
+    if ok and type(state) == "table" and type(state.context) == "string" then
       _G.kube.context = state.context
     end
   end
@@ -37,203 +36,211 @@ end
 
 load_state()
 
----@param cmd string The command to execute
----@param callback fun(data: string|nil)|nil Callback function to handle the output
----@param on_error fun(data: string|nil)|nil Callback function to handle the erroroutput
-local function kubectl(cmd, callback, on_error)
-  local args = vim.split(cmd, " ")
-  if _G.kube and _G.kube.context then
-    table.insert(args, 1, "--context")
-    table.insert(args, 2, _G.kube.context)
+---@param context string|nil The context to run against, nil for the kubeconfig current-context
+---@param args string[] kubectl arguments, without the global `--context` flag
+---@return string[]
+local function with_context(context, args)
+  if context then
+    return vim.list_extend({ "kubectl", "--context", context }, args)
   end
-  log.debug("kubectl.kubectl", args)
+  return vim.list_extend({ "kubectl" }, args)
+end
 
-  local job = Job:new({
-    command = "kubectl",
-    args = args,
-    on_exit = function(j, return_val)
-      if not callback then
-        return
-      end
+---@param namespace string|nil
+---@return string[]
+local function namespace_args(namespace)
+  if not namespace or namespace:lower() == "all" then
+    return {}
+  end
+  return { "-n", namespace }
+end
 
-      local result = table.concat(j:result(), "\n")
-      if return_val == 0 then
-        callback(result)
-      else
-        callback(nil)
-      end
-    end,
-    on_stderr = function(_, data)
-      if not on_error then
-        return
-      end
+---Run kubectl asynchronously, callbacks are invoked on the main loop.
+---@param args string[] The kubectl arguments
+---@param callback fun(data: string|nil)|nil Called with stdout on success, nil on failure
+---@param on_error fun(data: string)|nil Called with stderr on failure
+---@return vim.SystemObj|nil
+local function kubectl(context, args, callback, on_error)
+  local cmd = with_context(context, args)
+  log.debug("kubectl.kubectl", cmd)
 
-      if data then
-        on_error(data)
+  local ok, job = pcall(
+    vim.system,
+    cmd,
+    { text = true },
+    vim.schedule_wrap(function(out)
+      if out.code ~= 0 and on_error then
+        on_error(out.stderr or "")
       end
-    end,
-  })
-  job:start()
+      if callback then
+        callback(out.code == 0 and out.stdout or nil)
+      end
+    end)
+  )
+  if not ok then
+    vim.notify("Failed to run kubectl: " .. tostring(job), vim.log.levels.ERROR)
+    return nil
+  end
   return job
 end
 
+---@param args string[]
+---@return string[] Lines of stdout, empty on failure
+local function kubectl_sync(context, args)
+  local ok, out = pcall(function()
+    return vim.system(with_context(context, args), { text = true }):wait()
+  end)
+  if not ok or out.code ~= 0 then
+    return {}
+  end
+  return vim.split(out.stdout, "\n", { trimempty = true })
+end
+
+---@param context string|nil The context to run against
 ---@param resource_kind string The type of resource
 ---@param name string|nil The name of the resource, or nil to list all resources of the given type
 ---@param namespace string|nil The namespace of the resource, or nil to list all resources in all namespaces
 ---@param params table<string, any>|nil The parameters to pass to the get command
 ---@param callback function Callback function to handle the output
-function M.get(resource_kind, name, namespace, params, callback)
+function M.get(context, resource_kind, name, namespace, params, callback)
   log.debug("kubectl.get", resource_kind, name, namespace, params)
 
-  local cmd = "get " .. resource_kind .. " -o json"
+  local args = { "get", resource_kind, "-o", "json" }
   if name then
-    cmd = cmd .. " " .. name
+    table.insert(args, name)
   end
-  if namespace then
-    if namespace:lower() == "all" then
-      cmd = cmd .. " --all-namespaces"
-    else
-      cmd = cmd .. " -n " .. namespace
-    end
+  if namespace and namespace:lower() == "all" then
+    table.insert(args, "--all-namespaces")
+  else
+    vim.list_extend(args, namespace_args(namespace))
   end
 
-  if params then
-    for key, value in pairs(params) do
-      cmd = cmd .. " --" .. key .. "=" .. value
-    end
+  for key, value in pairs(params or {}) do
+    table.insert(args, string.format("--%s=%s", key, tostring(value)))
   end
 
-  return kubectl(cmd, callback)
+  return kubectl(context, args, callback)
 end
 
+---@param context string|nil The context to run against
 ---@param kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
 ---@param callback function Callback function to handle the output
-function M.get_resource_yaml(kind, name, namespace, callback)
+function M.get_resource_yaml(context, kind, name, namespace, callback)
   log.debug("kubectl.get_resource_yaml", kind, name, namespace)
 
-  local cmd = string.format("get %s %s -n %s -o yaml", string.lower(kind), name, namespace or "default")
-  return kubectl(cmd, callback)
+  local args = { "get", kind:lower(), name, "-o", "yaml" }
+  return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback)
 end
 
+---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param resource_name string|nil The name of the resource
 ---@param container_name string|nil The name of the container
 ---@param namespace string The namespace of the resource
 ---@param follow boolean|nil Whether to follow the logs (tail -f style)
----@param callback function Callback function to handle the output
----@return Job|nil The job object, or nil if the job is not started
-function M.logs(resource_kind, resource_name, container_name, namespace, follow, callback)
+---@param callback fun(data: string) Called with complete lines of stdout/stderr (newline separated)
+---@return vim.SystemObj|nil
+function M.logs(context, resource_kind, resource_name, container_name, namespace, follow, callback)
   log.debug("kubectl.logs", resource_kind, resource_name, container_name, namespace, follow)
 
-  local cmd = "logs"
-  if _G.kube and _G.kube.context then
-    cmd = cmd .. " --context " .. _G.kube.context
-  end
-  cmd = cmd .. string.format(" %s/%s", resource_kind, resource_name)
+  local args = { "logs", string.format("%s/%s", resource_kind, resource_name) }
   if container_name then
-    cmd = cmd .. " -c " .. container_name
+    vim.list_extend(args, { "-c", container_name })
   end
-  if namespace then
-    cmd = cmd .. " -n " .. namespace
+  vim.list_extend(args, namespace_args(namespace))
+
+  if not follow then
+    return kubectl(context, args, function(data)
+      if data then
+        callback((data:gsub("\n$", "")))
+      end
+    end, callback)
   end
 
-  if follow then
-    cmd = cmd .. " -f"
-    local job = Job:new({
-      command = "kubectl",
-      args = vim.split(cmd, " "),
-      on_stdout = function(_, data)
-        if data then
-          callback(data)
+  table.insert(args, "-f")
+
+  ---Emit only complete lines, as output arrives in arbitrary chunks
+  local function line_buffered()
+    local pending = ""
+    return function(_, data)
+      if not data then
+        if pending ~= "" then
+          vim.schedule_wrap(callback)(pending)
+          pending = ""
         end
-      end,
-      on_stderr = function(_, data)
-        if data then
-          callback(data)
-        end
-      end,
-    })
-    job:start()
-    return job
-  else
-    local job = Job:new({
-      command = "kubectl",
-      args = vim.split(cmd, " "),
-      on_stdout = function(_, data)
-        if data then
-          callback(data)
-        end
-      end,
-      on_stderr = function(_, data)
-        if data then
-          callback(data)
-        end
-      end,
-    })
-    job:start()
-    return job
+        return
+      end
+      pending = pending .. data
+      local last_newline = pending:match(".*()\n")
+      if last_newline then
+        vim.schedule_wrap(callback)(pending:sub(1, last_newline - 1))
+        pending = pending:sub(last_newline + 1)
+      end
+    end
   end
+
+  local cmd = with_context(context, args)
+  log.debug("kubectl.logs", cmd)
+  local ok, job = pcall(vim.system, cmd, { text = true, stdout = line_buffered(), stderr = line_buffered() })
+  if not ok then
+    vim.notify("Failed to run kubectl: " .. tostring(job), vim.log.levels.ERROR)
+    return nil
+  end
+  return job
 end
 
+---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
 ---@param port number The port to forward
 ---@param local_port number The local port to forward to
 ---@param callback fun(data: string|nil)|nil Callback function to handle the output
----@param on_error fun(data: string|nil)|nil Callback function to handle the error output
-function M.forward_port(resource_kind, name, namespace, port, local_port, callback, on_error)
+---@param on_error fun(data: string)|nil Callback function to handle the error output
+function M.forward_port(context, resource_kind, name, namespace, port, local_port, callback, on_error)
   log.debug("kubectl.forward_port", resource_kind, name, namespace, port, local_port)
 
-  local cmd = string.format("port-forward %s/%s -n %s %d:%d", resource_kind, name, namespace, local_port, port)
-  return kubectl(cmd, callback, on_error)
+  local args = { "port-forward", string.format("%s/%s", resource_kind, name), string.format("%d:%d", local_port, port) }
+  return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback, on_error)
 end
 
+---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string The namespace of the resource
 ---@param callback function Callback function to handle the output
-function M.describe(resource_kind, name, namespace, callback)
+function M.describe(context, resource_kind, name, namespace, callback)
   log.debug("kubectl.describe", resource_kind, name, namespace)
 
-  local cmd = string.format("describe %s %s -n %s", resource_kind, name, namespace)
-  return kubectl(cmd, callback)
+  local args = { "describe", resource_kind, name }
+  return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback)
 end
 
+---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param namespace string|nil The namespace of the resource, or nil to delete from default namespace
 ---@param callback fun(data: string?)? Callback function to handle the output
----@param on_error fun(data: string?)? Callback function to handle the error output
----@return Job|nil The job object, or nil if the job is not started
-function M.delete(resource_kind, name, namespace, callback, on_error)
+---@param on_error fun(data: string)? Callback function to handle the error output
+---@return vim.SystemObj|nil
+function M.delete(context, resource_kind, name, namespace, callback, on_error)
   log.debug("kubectl.delete", resource_kind, name, namespace)
 
-  local cmd = string.format("delete %s %s -n %s", resource_kind, name, namespace or "default")
-  return kubectl(cmd, callback, on_error)
+  local args = { "delete", resource_kind, name }
+  return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback, on_error)
 end
 
----@return string? The current context
+---@return string? The context switched to via `:Kube context`, or the kubeconfig current-context
 function M.get_current_context()
-  if _G.kube and _G.kube.context then
-    return _G.kube.context
-  end
-
-  local job = Job:new({
-    command = "kubectl",
-    args = { "config", "current-context" },
-  })
-  job:sync()
-  local result = job:result()
-  return result and result[1] or nil
+  return _G.kube.context or kubectl_sync(nil, { "config", "current-context" })[1]
 end
 
 ---@param callback function Callback function to handle the output
----@return Job|nil The job object, or nil if the job is not started
+---@return vim.SystemObj|nil
 function M.get_config(callback)
-  return kubectl("config view -o json", callback)
+  return kubectl(nil, { "config", "view", "-o", "json" }, callback)
 end
 
 function M.use_context(name, callback, on_error)
@@ -242,68 +249,79 @@ function M.use_context(name, callback, on_error)
   callback(true)
 end
 
+---@type table<string, string[]>
+local api_resources_cache = {}
+
 ---@return string[] The list of API resources
 function M.api_resources_sync()
-  local args = {}
-  if _G.kube and _G.kube.context then
-    table.insert(args, "--context")
-    table.insert(args, _G.kube.context)
+  local key = _G.kube.context or ""
+  if not api_resources_cache[key] then
+    local resources = kubectl_sync(_G.kube.context, { "api-resources", "--output=name" })
+    if #resources == 0 then
+      return resources
+    end
+    api_resources_cache[key] = resources
   end
-  table.insert(args, "api-resources")
-  table.insert(args, "--output=name")
-
-  local job = Job:new({
-    command = "kubectl",
-    args = args,
-  })
-  job:sync()
-  local result = job:result()
-  return result or {}
+  return api_resources_cache[key]
 end
 
 ---@return string[] The names of contexts
 function M.context_names_sync()
-  local job = Job:new({
-    command = "kubectl",
-    args = { "config", "get-contexts", "--output=name" },
-  })
-  job:sync()
-  local result = job:result()
-  return result or {}
+  return kubectl_sync(nil, { "config", "get-contexts", "--output=name" })
 end
 
+---@param context string|nil The context to run against
 ---@param namespace string The namespace to apply the YAML resource to
 ---@param file_path string The path to the YAML file
 ---@param callback function Callback function to handle the output
----@param on_error fun(data: string|nil)|nil Callback function to handle the error output
----@return Job|nil The job object, or nil if the job is not started
-function M.apply(namespace, file_path, callback, on_error)
-  local job = kubectl(string.format("-n %s apply -f %s", namespace, file_path), function(result)
-    if callback then
-      callback(result)
-    end
-  end, on_error)
-
-  return job
+---@param on_error fun(data: string)|nil Callback function to handle the error output
+---@return vim.SystemObj|nil
+function M.apply(context, namespace, file_path, callback, on_error)
+  local args = vim.list_extend(namespace_args(namespace), { "apply", "-f", file_path })
+  return kubectl(context, args, callback, on_error)
 end
 
+---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
 ---@param container string The name of the container
 ---@param image string The new image to set
 ---@param namespace string|nil The namespace of the resource, or nil to use default namespace
 ---@param callback function|nil Callback function to handle the output
----@param on_error fun(data: string|nil)|nil Callback function to handle the error output
----@return Job|nil The job object, or nil if the job is not started
-function M.set_image(resource_kind, name, namespace, container, image, callback, on_error)
-  local cmd = string.format("set image %s/%s %s=%s", resource_kind, name, container, image)
-  if namespace then
-    cmd = cmd .. " -n " .. namespace
+---@param on_error fun(data: string)|nil Callback function to handle the error output
+---@return vim.SystemObj|nil
+function M.set_image(context, resource_kind, name, namespace, container, image, callback, on_error)
+  local args = { "set", "image", string.format("%s/%s", resource_kind, name), string.format("%s=%s", container, image) }
+  vim.list_extend(args, namespace_args(namespace))
+
+  log.debug("kubectl.set_image", args)
+
+  return kubectl(context, args, callback, on_error)
+end
+
+---Build the argv for an interactive `kubectl exec` session.
+---@param context string|nil The context to run against
+---@param kind string The kind of resource
+---@param name string The name of the resource
+---@param namespace string|nil The namespace of the resource
+---@param container string|nil The name of the container
+---@return string[]
+function M.exec_cmd(context, kind, name, namespace, container)
+  local args = { "exec", "-it", string.format("%s/%s", kind:lower(), name) }
+  vim.list_extend(args, namespace_args(namespace))
+  if container then
+    vim.list_extend(args, { "-c", container })
   end
+  vim.list_extend(args, { "--", "sh", "-c", "command -v bash >/dev/null && exec bash || exec sh" })
+  return with_context(context, args)
+end
 
-  log.debug("kubectl.set_image", resource_kind, name, container, image, namespace, cmd)
-
-  return kubectl(cmd, callback, on_error)
+---Kill a job if it is still running.
+---@param job vim.SystemObj|nil
+function M.kill(job)
+  if job and not job:is_closing() then
+    job:kill(15)
+  end
 end
 
 return M
