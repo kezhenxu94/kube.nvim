@@ -49,6 +49,14 @@ local formatters = {
     require("kube.formatters.portforward"),
   },
   {
+    { "events", "event", "ev" },
+    require("kube.formatters.events"),
+  },
+  {
+    { "portforwards" },
+    require("kube.formatters.portforwards"),
+  },
+  {
     { "cronjobs", "cronjob", "cronjobs.batch", "cronjob.batch" },
     require("kube.formatters.cronjobs"),
   },

@@ -46,7 +46,7 @@ local function cell_at(kbuf, pos)
 end
 
 ---The buffer the cell at `pos` refers to, like a tag:
----NAMESPACE -> the same list in that namespace, NODE -> the node,
+---NAMESPACE -> the same list in that namespace, NODE -> the node, an event's OBJECT -> that object,
 ---a namespace row -> its pods, anything else -> the resource's definition (YAML).
 ---@param kbuf KubeBuffer
 ---@param pos integer[] (0,0)-indexed position
@@ -64,6 +64,16 @@ function M.tag_target(kbuf, pos)
       namespace = item.metadata.namespace,
       kind = kbuf.resource_kind,
       params = kbuf.params,
+    })
+  end
+  if cell.column == "OBJECT" and item.involvedObject then
+    local object = item.involvedObject
+    return utils.buf_name({
+      context = kbuf.context,
+      namespace = object.namespace,
+      kind = utils.resource_type(object),
+      name = object.name,
+      params = { output = "yaml" },
     })
   end
   if cell.column == "NODE" and item.spec and item.spec.nodeName then

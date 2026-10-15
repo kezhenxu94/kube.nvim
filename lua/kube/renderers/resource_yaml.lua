@@ -1,42 +1,36 @@
 local kubectl = require("kubectl")
-local log = require("kube.log")
 
-local M = {}
+---The YAML of the buffer's resource, editable: `:w` applies it.
+---@type Renderer
+local M = {
+  load = function(buffer)
+    assert(buffer.resource_name, "resource_name is required")
+    vim.bo[buffer.buf_nr].filetype = "yaml"
 
----@param buffer KubeBuffer The buffer to render into
-function M.load(buffer)
-  local self = buffer
-  local resource_kind = self.resource_kind
-  local resource_name = self.resource_name
-  local namespace = self.namespace
+    local job = kubectl.get_resource_yaml(
+      buffer.context,
+      buffer.resource_kind,
+      buffer.resource_name,
+      buffer.namespace,
+      function(yaml)
+        if not vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+          return
+        end
+        if yaml then
+          buffer:set_lines(vim.split(yaml, "\n"), true)
+        elseif vim.api.nvim_buf_line_count(buffer.buf_nr) == 1 then
+          -- Nothing loaded: nothing to edit and apply
+          vim.bo[buffer.buf_nr].modifiable = false
+        end
+      end,
+      buffer:on_error()
+    )
 
-  log.debug("rendering yaml buffer", resource_kind, resource_name, namespace)
-
-  vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
-  vim.api.nvim_set_option_value("filetype", "yaml", { buf = self.buf_nr })
-
-  assert(resource_name, "resource_name is required")
-
-  local job = kubectl.get_resource_yaml(self.context, resource_kind, resource_name, namespace, function(yaml)
-    if not vim.api.nvim_buf_is_valid(self.buf_nr) then
-      return
+    if job then
+      buffer.jobs[job.pid] = job
     end
-
-    if yaml then
-      vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, vim.split(yaml, "\n"))
-    else
-      vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, { "Failed to get resource YAML" })
-    end
-
-    vim.api.nvim_set_option_value("modifiable", yaml ~= nil, { buf = self.buf_nr })
-    vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
-  end)
-
-  if job then
-    self.jobs[job.pid] = job
-  end
-
-  return job
-end
+    return job
+  end,
+}
 
 return M

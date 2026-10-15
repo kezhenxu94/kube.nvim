@@ -63,114 +63,118 @@ local function restore_cursors(saved, formatted_rows)
 end
 
 ---@param buffer KubeBuffer The buffer to render into
-function M.load(buffer)
-  local self = buffer
-  local resource_kind = self.resource_kind
-  local resource_name = self.resource_name
-  local subresource_kind = self.subresource_kind
-  local namespace = self.namespace
-  local params = self.params
-  local formatter = formatters[resource_kind]
-  if subresource_kind and formatters[subresource_kind] then
-    formatter = formatters[subresource_kind]
-    log.debug("formatter for subresource found", subresource_kind, formatter)
+---@return Formatter
+local function formatter_for(buffer)
+  if buffer.subresource_kind and formatters[buffer.subresource_kind] then
+    return formatters[buffer.subresource_kind]
   end
+  return formatters[buffer.resource_kind]
+end
 
-  log.debug("loading buffer", resource_kind, resource_name, namespace, subresource_kind, params)
+---@param buffer KubeBuffer The buffer to render into
+function M.load(buffer)
+  log.debug("loading buffer", buffer.resource_kind, buffer.resource_name, buffer.namespace, buffer.params)
 
-  local headers = formatter.headers
-  local kubectl = require("kubectl")
-  local job = kubectl.get(self.context, resource_kind, resource_name, namespace, params, function(result)
-    if not result or result == "" then
-      log.debug("empty result", namespace, resource_kind, resource_name)
-      return
-    end
-    if not vim.api.nvim_buf_is_valid(self.buf_nr) then
-      return
-    end
-
-    local cursors = save_cursors(self)
-
-    vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
-    vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
-    vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
-    self.mark_mappings = {}
-    self.mark_columns = {}
-
-    local data = vim.json.decode(result)
-    buffer.data = data
-
-    local rows = formatter.format(data, self)
-
-    self:setup()
-
-    local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
-    buffer.header_row = header_row
-    local win_id = vim.fn.bufwinid(self.buf_nr)
-    if win_id ~= -1 then
-      vim.api.nvim_set_option_value("winbar", utils.get_winbar(self.buf_nr), { win = win_id })
-    end
-
-    local lines = {}
-    for _, row in ipairs(formatted_rows) do
-      table.insert(lines, row.formatted)
-    end
-    vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
-    restore_cursors(cursors, formatted_rows)
-
-    local diagnostics = {}
-    for row_num, row in ipairs(formatted_rows) do
-      if row.raw then
-        local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
-          invalidate = true,
-          line_hl_group = row.highlight or "KubeBody",
-        })
-        self.mark_mappings[mark_id] = {
-          item = row.raw,
-        }
+  local job = require("kubectl").get(
+    buffer.context,
+    buffer.resource_kind,
+    buffer.resource_name,
+    buffer.namespace,
+    buffer.params,
+    function(result)
+      if result and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+        M.render(buffer, formatter_for(buffer), vim.json.decode(result))
       end
-
-      local col_pos = 0
-      for i, col_width in ipairs(col_widths) do
-        -- Same widths and separator as `align_row`
-        local width = math.min(MAX_COLUMN_WIDTH, col_width)
-        local mark_id =
-          vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
-            end_col = col_pos + width,
-            invalidate = true,
-          })
-        self.mark_columns[mark_id] = {
-          item = row.raw,
-          column = headers[i],
-        }
-        col_pos = col_pos + width + #COLUMN_SEPARATOR
-      end
-
-      if row.diagnostics then
-        for _, diagnostic in ipairs(row.diagnostics) do
-          table.insert(diagnostics, {
-            bufnr = self.buf_nr,
-            lnum = row_num - 1,
-            col = 0,
-            message = diagnostic.message,
-            severity = diagnostic.severity,
-          })
-        end
-      end
-    end
-
-    if #diagnostics > 0 then
-      vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, buffer.buf_nr, diagnostics, {})
-    end
-
-    vim.api.nvim_set_option_value("modified", false, { buf = buffer.buf_nr })
-  end)
+    end,
+    buffer:on_error()
+  )
 
   if job then
-    self.jobs[job.pid] = job
+    buffer.jobs[job.pid] = job
   end
 
   return job
+end
+
+---Render the rows of `data` as a table, keeping the cursors on the same rows.
+---@param buffer KubeBuffer The buffer to render into
+---@param formatter Formatter
+---@param data table|nil The decoded kubectl output
+function M.render(buffer, formatter, data)
+  local self = buffer
+  -- Edits made while a background reload was running win over the reload
+  if self.silent and vim.bo[self.buf_nr].modified then
+    return
+  end
+  local headers = formatter.headers
+  local cursors = save_cursors(self)
+
+  vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
+  vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
+  vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
+  self.mark_mappings = {}
+  self.mark_columns = {}
+  self.data = data
+
+  local rows = formatter.format(data, self)
+
+  self:setup()
+
+  local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
+  self.header_row = header_row
+  utils.update_winbar(self)
+
+  local lines = {}
+  for _, row in ipairs(formatted_rows) do
+    table.insert(lines, row.formatted)
+  end
+  self:set_lines(lines, true)
+  restore_cursors(cursors, formatted_rows)
+  if #lines == 0 then
+    self:set_status("No resources found", "Comment")
+  end
+
+  local diagnostics = {}
+  for row_num, row in ipairs(formatted_rows) do
+    if row.raw then
+      local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+        invalidate = true,
+        line_hl_group = row.highlight or "KubeBody",
+      })
+      self.mark_mappings[mark_id] = {
+        item = row.raw,
+      }
+    end
+
+    local col_pos = 0
+    for i, col_width in ipairs(col_widths) do
+      -- Same widths and separator as `align_row`
+      local width = math.min(MAX_COLUMN_WIDTH, col_width)
+      local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
+        end_col = col_pos + width,
+        invalidate = true,
+      })
+      self.mark_columns[mark_id] = {
+        item = row.raw,
+        column = headers[i],
+      }
+      col_pos = col_pos + width + #COLUMN_SEPARATOR
+    end
+
+    for _, diagnostic in ipairs(row.diagnostics or {}) do
+      table.insert(diagnostics, {
+        bufnr = self.buf_nr,
+        lnum = row_num - 1,
+        col = 0,
+        message = diagnostic.message,
+        severity = diagnostic.severity,
+      })
+    end
+  end
+
+  if #diagnostics > 0 then
+    vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr, diagnostics, {})
+  end
 end
 
 ---@class FormattedTableRow

@@ -1,0 +1,181 @@
+*kube.txt*  Manage Kubernetes resources like buffers
+
+==============================================================================
+CONTENTS                                                       *kube-contents*
+
+  1. Introduction ........................................... |kube.nvim|
+  2. Commands ............................................... |kube-commands|
+  3. Buffers ................................................ |kube-buffers|
+  4. Keymaps ................................................ |kube-keymaps|
+  5. Language server ........................................ |kube-lsp|
+  6. Editing ................................................ |kube-editing|
+  7. Configuration .......................................... |kube-config|
+  8. Health ................................................. |kube-health|
+
+==============================================================================
+1. Introduction                                         *kube.nvim* *kube*
+
+kube.nvim shows Kubernetes resources in buffers: lists, `kubectl describe`,
+YAML, logs, events and decoded secrets. Delete a line and |:w| to delete a
+resource, edit the YAML and |:w| to apply it.
+
+Requirements: Neovim >= 0.11 and `kubectl` in $PATH.
+
+|setup()| is optional, the |:Kube| command and the `kube://` buffers work
+without it.
+
+==============================================================================
+2. Commands                                                    *kube-commands*
+
+                                                                       *:Kube*
+:Kube get {kind} [namespace={ns}] [selector={labels}]
+    Open the list of {kind}, in all namespaces unless {ns} is given.
+    Example: `:Kube get pods selector=app=web,tier=frontend`
+
+:Kube delete {kind} {name} [namespace={ns}]
+    Delete a resource after confirming.
+
+:Kube context [{context}]
+    Switch the context used by new buffers, only in kube.nvim: the kubeconfig
+    is not changed. Without {context}, select one.
+
+:Kube apply                                                      *:Kube-apply*
+:Kube! apply
+    Apply the current buffer as a manifest to the current context, after
+    showing `kubectl diff` and confirming. With ! there is no confirmation.
+
+:Kube diff                                                        *:Kube-diff*
+    Show `kubectl diff` of the current buffer as a manifest.
+
+:Kube portforwards                                        *:Kube-portforwards*
+    List all port forwards, of all contexts. Delete a line and |:w| to stop
+    the port forward.
+
+==============================================================================
+3. Buffers                                                      *kube-buffers*
+
+Every view is a buffer named: >
+    kube://[context/{context}/][namespaces/{ns}/]{kind}[/{name}[/{sub}]][?{params}]
+<
+Examples: >
+    :e kube://deployments                    " all namespaces
+    :e kube://namespaces/staging/deployments " the staging namespace
+    :e kube://context/production/pods        " the production context
+<
+A name without `context/{context}/` uses the current context, and is renamed
+to include it when the buffer is opened: the buffer keeps operating on that
+cluster after switching contexts with |:Kube| context. Contexts with `/` or `:`
+are percent-encoded.
+
+Kinds are group qualified (e.g. `deployment.apps`) so kubectl never picks a
+same-named kind of another API group.
+
+Views of a resource ({sub} and {params}):
+    `?output=yaml`          The YAML, editable, see |kube-editing|
+    (none)                `kubectl describe`
+    `/containers`           The containers of a pod
+    `/logs`                 Logs, params: `container`, `follow`, `previous`,
+                          `all-containers`, `since` (e.g. `1h`), `tail`
+    `/portforward`          The port forwards of the resource
+    `/history`              `kubectl rollout history`
+    `/data`                 The decoded data of a secret, see |kube-secrets|
+Lists take kubectl flags as params, e.g. `?selector=app=web` or
+`?field-selector=involvedObject.name=web`.
+
+==============================================================================
+4. Keymaps                                                      *kube-keymaps*
+
+Keymaps follow Neovim's conventions: LSP's |gd|, |K|, |CTRL-]| and the
+built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
+
+    <CR>    Drill down: a pod's containers, a deployment's pods, a secret's
+            decoded data, ...
+    gd      Go to what the cell under the cursor refers to, see |kube-jump|
+    K       Describe the resource under the cursor (LSP hover)
+    -       Parent: resource -> list in its namespace -> all namespaces ->
+            namespaces
+    R       Reload, the cursor stays on the same resource
+    gw      Toggle watching: reload the list every `refresh_interval`
+    gl gL   Show / follow logs, <C-c> stops following
+    gf      Forward ports
+    gF      Show port forwards
+    gi      Set image
+    gs      Shell (`kubectl exec`)
+    g?      Help
+    q       Quit (wipe) the buffer
+
+                                                                   *kube-jump*
+|CTRL-]| (and |gd|) jump to what the cell under the cursor refers to:
+    NAMESPACE       the same list in that namespace
+    NODE            the node
+    OBJECT (events) the involved object
+    a namespace row the pods in it
+    anything else   the resource's YAML
+|CTRL-T| jumps back and |CTRL-W_]| opens the jump in a split, as with tags.
+
+Built-in keys that also work: |]d| / |[d| to the next / previous unhealthy
+resource, |CTRL-W_d| shows why, |gx| opens a port forward URL.
+
+==============================================================================
+5. Language server                                                  *kube-lsp*
+
+kube.nvim attaches an in-process language server named "kube" to its buffers,
+so LSP keymaps and pickers work on them:
+    hover               describe (|K|)
+    definition          |kube-jump|
+    document symbols    the resources of the list (|gO|)
+    code actions        every operation on the resource under the cursor
+                        (|gra|), or on all resources of a visual selection:
+
+    Open, Describe, Go to YAML, Show events, Show logs, Follow logs, Show logs
+    of all containers, Show logs of the previous instance, Show logs since…,
+    Exec, Forward port, Show port forwards, Set image, Scale…, Restart, Undo
+    rollout, Rollout history, Decode secret, Cordon, Uncordon, Drain, Delete
+
+Operations changing the cluster ask for confirmation, naming the context.
+
+==============================================================================
+6. Editing                                                      *kube-editing*
+
+Lists: delete lines and |:w| to delete those resources, after confirming.
+
+YAML (`gd`): |:w| shows `kubectl diff` and applies after confirming. |:w!|
+applies without confirming.
+
+                                                                *kube-secrets*
+Decoded secrets (<CR> on a secret): one `key: "value"` per line, values in
+JSON string syntax (`\n`, `\"`, ...). Values that are not UTF-8 are shown as
+`key: !!binary "<base64>"`. |:w| patches the secret after confirming the added,
+changed and removed keys; |:w!| without confirming.
+
+==============================================================================
+7. Configuration                                                 *kube-config*
+
+Defaults: >lua
+    require("kube").setup({
+      keymaps = {
+        drill_down = "<cr>", show_yaml = "gd", describe = "K", parent = "-",
+        refresh = "R", watch = "gw", show_logs = "gl", follow_logs = "gL",
+        port_forward = "gF", forward_port = "gf", set_image = "gi",
+        exec = "gs", quit = "q", help = "g?",
+      },
+      -- How often watched lists (gw) reload, in ms, false to disable watching
+      refresh_interval = 10000,
+      -- kubectl --request-timeout, except for streams (logs -f, port-forward)
+      request_timeout = "30s",
+      logs = { tail = 1000 }, -- -1 for all
+      highlights = {
+        KubeBody = { fg = "#40a02b" }, KubePending = { fg = "#fe640b" },
+        KubeRunning = { fg = "#40a02b" }, KubeFailed = { fg = "#d20f39" },
+        KubeSucceeded = { fg = "#9ca0b0" }, KubeUnknown = { fg = "#6c6f85" },
+        KubeHeader = { fg = "#df8e1d", bold = true },
+      },
+    })
+<
+==============================================================================
+8. Health                                                        *kube-health*
+
+`:checkhealth kube` checks the Neovim version, kubectl, the current context
+and whether its cluster is reachable.
+
+ vim:tw=78:ts=8:ft=help:norl:

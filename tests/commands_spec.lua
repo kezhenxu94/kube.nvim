@@ -101,7 +101,7 @@ describe(":Kube completion", function()
   it("completes subcommands", function()
     local items = vim.fn.getcompletion("Kube ", "cmdline")
     table.sort(items)
-    t.eq({ "context", "delete", "get" }, items)
+    t.eq({ "apply", "context", "delete", "diff", "get", "portforwards" }, items)
     t.eq({ "get" }, vim.fn.getcompletion("Kube g", "cmdline"))
   end)
 

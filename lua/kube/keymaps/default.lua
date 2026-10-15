@@ -65,8 +65,17 @@ local M = {
     map_action(config.keymaps.follow_logs, "follow logs for the resource under the cursor", "show_logs", true)
     map_action(config.keymaps.port_forward, "show port forwards for the resource under the cursor", "port_forward")
     map_action(config.keymaps.forward_port, "forward ports for the resource under the cursor", "forward_port")
-    map_action(config.keymaps.show_yaml, "go to the YAML definition of the resource, :w applies it", "show_yaml")
-    map_action(config.keymaps.describe, "describe the resource under the cursor", "describe")
+    -- Like the LSP definition: what the cell refers to (see kube.navigation), mostly the YAML
+    map(config.keymaps.show_yaml, "go to what the cell under the cursor refers to (YAML: :w applies it)", function()
+      local cursor = vim.api.nvim_win_get_cursor(0)
+      local target = require("kube.navigation").tag_target(kbuf, { cursor[1] - 1, cursor[2] })
+      if target then
+        vim.cmd.edit(vim.fn.fnameescape(target))
+      else
+        run_action(kbuf, "show_yaml")
+      end
+    end)
+
     map_action(config.keymaps.set_image, "set image for the resource under the cursor", "set_image")
     map_action(config.keymaps.exec, "exec into the resource under the cursor", "exec")
 
@@ -81,6 +90,14 @@ local M = {
 
     map(config.keymaps.help, "show this help", function()
       require("kube.help").show(buf_nr)
+    end)
+
+    map(config.keymaps.describe, "describe the resource under the cursor (LSP hover)", function()
+      vim.lsp.buf.hover()
+    end)
+
+    map(config.keymaps.watch, "toggle reloading the list periodically", function()
+      require("kube.refresh").toggle(kbuf)
     end)
 
     map(config.keymaps.refresh, "refresh the resources in the buffer", function()

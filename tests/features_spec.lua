@@ -1,0 +1,515 @@
+local t = require("helpers")
+local utils = require("kube.utils")
+
+require("kube").setup({ refresh_interval = 200 })
+require("kubectl")
+
+---@param name string
+local function open(name)
+  vim.cmd.edit(vim.fn.fnameescape(name))
+  t.wait_loaded()
+end
+
+---@param name string
+local function wait_buf_name(name)
+  t.wait_for(function()
+    return vim.api.nvim_buf_get_name(0) == name
+  end, "buffer " .. name .. ", current: " .. vim.api.nvim_buf_get_name(0))
+end
+
+---@param pattern string
+local function wait_call(pattern, count)
+  t.wait_for(function()
+    return #t.calls_matching(pattern) >= (count or 1)
+  end, "kubectl call matching " .. pattern)
+end
+
+local function wait_lsp()
+  t.wait_for(function()
+    local client = vim.lsp.get_clients({ bufnr = 0, name = "kube" })[1]
+    return client and client.initialized
+  end, "the kube language server")
+end
+
+---Run the code action with `title`, on the cursor line or the given rows (1-indexed).
+---@param title string
+---@param rows integer[]|nil
+local function code_action(title, rows)
+  wait_lsp()
+  local titles
+  vim.lsp.buf.code_action({
+    filter = function(action)
+      titles = titles or {}
+      table.insert(titles, action.title)
+      return action.title == title
+    end,
+    apply = true,
+    range = rows and { start = { rows[1], 0 }, ["end"] = { rows[2], 0 } } or nil,
+  })
+  t.wait_for(function()
+    return titles
+  end, "code actions")
+  t.ok(vim.tbl_contains(titles, title), title .. " not in " .. vim.inspect(titles))
+end
+
+---@return string[]
+local function prompts()
+  local seen = {}
+  t.answer_prompts(function(items, opts)
+    table.insert(seen, opts.prompt)
+    return items[1]
+  end)
+  return seen
+end
+
+local PODS = "kube://context/ctx-a/namespaces/ns1/pods"
+
+before_each(function()
+  t.reset_kubectl()
+  _G.kube.context = nil
+  t.respond("*config current-context*", { stdout = "ctx-a\n" })
+  t.respond("*get pods -o json*", { fixture = "pods.json" })
+  t.respond("*get deployments -o json*", { fixture = "deployments.json" })
+  t.respond("*get deployment.apps web -o yaml*", { fixture = "deployment-web.yaml" })
+  t.respond("*get secrets -o json*", { fixture = "secrets.json" })
+  t.respond("*get secret -o json db *", { fixture = "secret-db.json" })
+  t.respond("*get events -o json*", { fixture = "events.json" })
+  t.respond("*get nodes -o json*", { fixture = "nodes.json" })
+  t.capture_notify()
+end)
+
+after_each(function()
+  t.restore_stubs()
+  t.clean_buffers()
+  for _, forwards in pairs(_G.portforwards) do
+    for _, forward in pairs(forwards) do
+      require("kubectl").kill(forward.job)
+    end
+  end
+  _G.portforwards = {}
+end)
+
+describe("errors", function()
+  it("are shown in the buffer and notified", function()
+    local messages = t.capture_notify()
+    t.respond("*get pods -o json*", { stderr = "Error from server (Forbidden): pods is forbidden", code = 1 })
+    open("kube://namespaces/ns1/pods")
+    t.eq("✗ Error from server (Forbidden): pods is forbidden", t.status())
+    t.eq("Error from server (Forbidden): pods is forbidden", messages[#messages].msg)
+  end)
+
+  it("are not notified on background reloads", function()
+    open("kube://namespaces/ns1/pods")
+    local messages = t.capture_notify()
+    t.respond("*get pods -o json*", { stderr = "connection refused", code = 1 })
+    _G.kube_buffers[vim.api.nvim_get_current_buf()]:load({ silent = true })
+    t.wait_loaded()
+    t.eq("✗ connection refused", t.status())
+    t.eq({}, messages)
+    t.eq(2, #t.lines(), "the last rendered list is kept")
+  end)
+
+  it("reloading a closed buffer is a no-op", function()
+    open("kube://namespaces/ns1/pods")
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    vim.cmd("bwipeout!")
+    kbuf:load()
+  end)
+
+  it("lists do not wrap, other views do", function()
+    vim.o.wrap = true
+    open("kube://namespaces/ns1/pods")
+    t.eq(false, vim.wo.wrap)
+    open("kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml")
+    t.eq(true, vim.wo.wrap)
+  end)
+
+  it("an empty list says so", function()
+    t.respond("*get pods -o json*", { stdout = '{"items":[]}' })
+    open("kube://namespaces/ns1/pods")
+    t.eq("No resources found", t.status())
+  end)
+end)
+
+describe("applying YAML", function()
+  local EDIT = "kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml"
+
+  before_each(function()
+    t.respond("*apply*", { stdout = "deployment.apps/web configured" })
+    open(EDIT)
+    vim.api.nvim_buf_set_lines(0, 5, 6, false, { "  replicas: 3" })
+  end)
+
+  it("shows the diff and applies once confirmed", function()
+    t.respond("*diff*", { stdout = "-  replicas: 2\n+  replicas: 3\n", code = 1 })
+    local diff_shown
+    t.answer_prompts(function(_, opts)
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        if vim.bo[buf].filetype == "diff" then
+          diff_shown = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+        end
+      end
+      t.eq("Apply deployment.apps/web (context: ctx-a)?", opts.prompt)
+      return "Yes"
+    end)
+    vim.cmd.write()
+    wait_call("apply")
+    t.eq({ "-  replicas: 2", "+  replicas: 3" }, diff_shown)
+    t.eq(1, #t.calls_matching("^%-%-context ctx%-a %-n ns1 diff %-f "))
+    t.wait_for(function()
+      return not vim.bo.modified
+    end, "reload")
+    t.eq(1, #vim.api.nvim_tabpage_list_wins(0), "diff window is closed")
+  end)
+
+  it("does not apply when declined", function()
+    t.respond("*diff*", { stdout = "-a\n+b\n", code = 1 })
+    t.answer_prompts(function()
+      return "No"
+    end)
+    vim.cmd.write()
+    wait_call("diff")
+    vim.wait(100)
+    t.eq({}, t.calls_matching("apply"))
+    t.eq(true, vim.bo.modified)
+  end)
+
+  it(":w! applies without the diff", function()
+    vim.cmd("write!")
+    wait_call("apply")
+    t.eq({}, t.calls_matching("diff"))
+  end)
+
+  it("reloads without applying when there is no difference", function()
+    t.respond("*diff*", { stdout = "", code = 0 })
+    vim.cmd.write()
+    t.wait_for(function()
+      return not vim.bo.modified
+    end, "reload")
+    t.eq({}, t.calls_matching("apply"))
+  end)
+
+  it("reports diff errors and keeps the edits", function()
+    local messages = t.capture_notify()
+    t.respond("*diff*", { stderr = "error: invalid object", code = 2 })
+    vim.cmd.write()
+    t.wait_for(function()
+      return #messages > 0
+    end)
+    t.eq("Failed to diff: error: invalid object", messages[1].msg)
+    t.eq(true, vim.bo.modified)
+  end)
+end)
+
+describe(":Kube apply / diff", function()
+  before_each(function()
+    vim.cmd.enew()
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, { "apiVersion: v1", "kind: ConfigMap" })
+  end)
+
+  it("apply confirms with the diff in the current context", function()
+    t.respond("*diff*", { stdout = "+kind: ConfigMap\n", code = 1 })
+    t.respond("*apply*", { stdout = "configmap/x created" })
+    local seen = prompts()
+    vim.cmd("Kube apply")
+    wait_call("apply")
+    t.eq({ "Apply buffer (context: ctx-a)?" }, seen)
+    t.eq(1, #t.calls_matching("^%-%-context ctx%-a apply %-f .*%.yaml$"))
+  end)
+
+  it("Kube! apply skips the confirmation", function()
+    t.respond("*apply*", { stdout = "configmap/x created" })
+    vim.cmd("Kube! apply")
+    wait_call("apply")
+    t.eq({}, t.calls_matching("diff"))
+  end)
+
+  it("diff shows the differences", function()
+    t.respond("*diff*", { stdout = "+kind: ConfigMap\n", code = 1 })
+    vim.cmd("Kube diff")
+    t.wait_for(function()
+      return #vim.api.nvim_tabpage_list_wins(0) == 2
+    end, "diff window")
+    t.eq({}, t.calls_matching("apply"))
+  end)
+end)
+
+describe("secrets", function()
+  local DATA = "kube://context/ctx-a/namespaces/ns1/secret/db/data"
+
+  it("<CR> shows the decoded data", function()
+    open("kube://namespaces/ns1/secrets")
+    t.press_on("db", "<CR>")
+    wait_buf_name(DATA)
+    t.wait_loaded()
+    local lines = t.lines()
+    t.eq({
+      'cert: !!binary "/wAB"',
+      'password: "p@ss\\"word\\nline2"',
+      'username: "admin"',
+    }, vim.list_slice(lines, #require("kube.secret").HEADER + 1))
+    t.eq(true, vim.bo.modifiable)
+  end)
+
+  it("saving patches added, changed and removed keys", function()
+    t.respond("*patch*", { stdout = "secret/db patched" })
+    open(DATA)
+    local seen = prompts()
+    local header = #require("kube.secret").HEADER
+    vim.api.nvim_buf_set_lines(0, header, -1, false, {
+      'password: "p@ss\\"word\\nline2"',
+      'username: "root"',
+      'token: "abc"',
+    })
+    vim.cmd.write()
+    wait_call("patch")
+
+    t.eq({ "Update secret ns1/db (context: ctx-a): added token; changed username; removed cert?" }, seen)
+    local patch = vim.json.decode(t.calls_matching("patch")[1]:match("%-p (%b{})"))
+    t.eq({ data = { token = vim.base64.encode("abc"), username = vim.base64.encode("root"), cert = vim.NIL } }, patch)
+    t.eq(1, #t.calls_matching("^%-%-context ctx%-a patch secret db %-%-type=merge %-p .* %-n ns1$"))
+  end)
+
+  it("rejects invalid lines", function()
+    local messages = t.capture_notify()
+    open(DATA)
+    vim.api.nvim_buf_set_lines(0, -1, -1, false, { "broken line" })
+    vim.cmd.write()
+    t.eq('Invalid secret data, line 7: expected `key: "value"`', messages[#messages].msg)
+    t.eq({}, t.calls_matching("patch"))
+  end)
+
+  it("round-trips values exactly", function()
+    local secret = require("kube.secret")
+    local data = vim.json.decode(t.fixture("secret-db.json")).data
+    t.eq(data, secret.from_lines(secret.to_lines(data)))
+  end)
+end)
+
+describe("events", function()
+  it("lists the most recent first with warnings as diagnostics", function()
+    open("kube://namespaces/ns1/events")
+    t.ok(t.lines()[1]:match("Warning%s+BackOff%s+deployment/web%s+Back%-off restarting failed container"), t.lines()[1])
+    t.ok(t.lines()[2]:match("Normal%s+Pulled%s+pod/web%-1"), t.lines()[2])
+    local diagnostics = vim.diagnostic.get(0)
+    t.eq(1, #diagnostics)
+    t.eq(0, diagnostics[1].lnum)
+  end)
+
+  it("<C-]> on the object goes to it", function()
+    open("kube://namespaces/ns1/events")
+    t.press_on("deployment/web", "<C-]>")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml")
+  end)
+
+  it("are shown for the resource under the cursor", function()
+    open("kube://namespaces/ns1/pods")
+    t.press_on("web-1", "")
+    code_action("Show events")
+    wait_buf_name(PODS:gsub("pods$", "events") .. "?field-selector=involvedObject.kind=Pod,involvedObject.name=web-1")
+    wait_call("get events")
+    t.eq(
+      1,
+      #t.calls_matching(
+        "get events %-o json %-n ns1 %-%-field%-selector=involvedObject.kind=Pod,involvedObject.name=web%-1$"
+      )
+    )
+  end)
+end)
+
+describe("operations", function()
+  it("scale", function()
+    t.respond("*scale*", { stdout = "deployment.apps/web scaled" })
+    t.answer_prompts(nil, "3")
+    open("kube://namespaces/ns1/deployments")
+    t.press_on("web", "")
+    code_action("Scale…")
+    wait_call("scale")
+    t.eq({ "--context ctx-a scale deployment.apps/web --replicas=3 -n ns1" }, t.calls_matching("scale"))
+    wait_call("get deployments", 2)
+  end)
+
+  it("restart and undo confirm with the context", function()
+    t.respond("*rollout*", { stdout = "ok" })
+    local seen = prompts()
+    open("kube://namespaces/ns1/deployments")
+    t.press_on("web", "")
+    code_action("Restart")
+    wait_call("rollout restart")
+    code_action("Undo rollout")
+    wait_call("rollout undo")
+    t.eq({
+      "Restart deployment.apps/web (context: ctx-a)?",
+      "Undo the rollout of deployment.apps/web (context: ctx-a)?",
+    }, seen)
+    t.eq({
+      "--context ctx-a rollout restart deployment.apps/web -n ns1",
+      "--context ctx-a rollout undo deployment.apps/web -n ns1",
+    }, t.calls_matching("rollout"))
+  end)
+
+  it("rollout history", function()
+    t.respond("*rollout history*", { stdout = "REVISION  CHANGE-CAUSE\n1         <none>\n" })
+    open("kube://namespaces/ns1/deployments")
+    t.press_on("web", "")
+    code_action("Rollout history")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployment.apps/web/history")
+    t.wait_loaded()
+    t.eq({ "REVISION  CHANGE-CAUSE", "1         <none>" }, t.lines())
+  end)
+
+  it("logs with options", function()
+    open("kube://namespaces/ns1/pods")
+    t.press_on("web-1", "")
+    code_action("Show logs of the previous instance")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?previous=true")
+    wait_call("logs")
+    t.eq({ "--context ctx-a logs pod/web-1 -n ns1 --tail=1000 --previous" }, t.calls_matching("logs"))
+  end)
+
+  it("on a range apply to all selected resources", function()
+    t.respond("*delete*", { stdout = "deleted" })
+    local seen = prompts()
+    open("kube://namespaces/ns1/pods")
+    code_action("Delete 2 resources", { 1, 2 })
+    wait_call("delete", 2)
+    t.eq({ "Delete pod/web-1, pod/web-2 (context: ctx-a)?" }, seen)
+  end)
+
+  it("on nodes", function()
+    t.respond("*cordon*", { stdout = "cordoned" })
+    t.respond("*drain*", { stdout = "drained" })
+    local seen = prompts()
+    open("kube://nodes")
+    code_action("Cordon 2 resources", { 1, 2 })
+    wait_call("cordon", 2)
+    t.eq({}, seen, "cordon is not confirmed")
+    t.press_on("node-2", "")
+    code_action("Drain")
+    wait_call("drain")
+    t.eq({ "Drain node/node-2 (context: ctx-a)?" }, seen)
+    t.eq({ "--context ctx-a drain node-2 --ignore-daemonsets --delete-emptydir-data" }, t.calls_matching("drain"))
+  end)
+
+  it("are offered by kind", function()
+    open("kube://namespaces/ns1/pods")
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    local operations = require("kube.operations")
+    local function titles(items)
+      return vim.tbl_map(function(operation)
+        return operation.title
+      end, operations.for_items(kbuf, items))
+    end
+    local pod = vim.json.decode(t.fixture("pod-web-1.json"))
+    local deployment = vim.json.decode(t.fixture("deployments.json")).items[1]
+    t.ok(vim.tbl_contains(titles({ pod }), "Exec"))
+    t.ok(not vim.tbl_contains(titles({ pod }), "Scale…"))
+    t.ok(vim.tbl_contains(titles({ deployment }), "Scale…"))
+    t.eq({ "Delete 2 resources" }, titles({ pod, deployment }), "mixed kinds only share delete")
+  end)
+end)
+
+describe("global port forwards", function()
+  it("lists forwards of all contexts, deleting a line stops it", function()
+    t.respond("*port-forward*", { script = "sleep 30" })
+    local function forward(name, local_port)
+      local asked = false
+      t.answer_prompts(function(items)
+        if asked then
+          return nil
+        end
+        asked = true
+        return items[1]
+      end, tostring(local_port))
+      open(name)
+      t.press_on("web-1", "gf")
+    end
+    forward("kube://context/ctx-a/namespaces/ns1/pods", 18080)
+    forward("kube://context/ctx-b/namespaces/ns1/pods", 28080)
+    t.restore_stubs()
+    t.capture_notify()
+
+    vim.cmd("Kube portforwards")
+    wait_buf_name("kube://portforwards")
+    t.eq(2, #t.lines())
+    t.ok(t.lines()[1]:match("^ctx%-a%s+ns1%s+pod/web%-1%s+18080%s+8080%s+http://localhost:18080"), t.lines()[1])
+    t.ok(t.lines()[2]:match("^ctx%-b"), t.lines()[2])
+
+    local job = _G.portforwards[utils.portforward_key("ctx-b", "ns1", "pod", "web-1")][28080].job
+    t.answer_prompts(function()
+      return "Yes"
+    end)
+    t.press_on("ctx-b", "dd")
+    vim.cmd.write()
+    t.wait_for(function()
+      return job:is_closing() and #t.lines() == 1
+    end, "forward to stop")
+    t.ok(_G.portforwards[utils.portforward_key("ctx-a", "ns1", "pod", "web-1")][18080], "the other forward is kept")
+  end)
+end)
+
+describe("watch", function()
+  it("gw toggles periodic reloads, paused while the buffer is modified", function()
+    open("kube://namespaces/ns1/pods")
+    t.eq(1, #t.calls_matching("get pods"))
+
+    vim.api.nvim_feedkeys("gw", "mx", false)
+    t.ok(vim.wo.winbar:find("⟳ 0.2s", 1, true), vim.wo.winbar)
+    wait_call("get pods", 3)
+
+    vim.cmd("normal! dd")
+    local paused = #t.calls_matching("get pods")
+    vim.wait(500)
+    t.eq(paused, #t.calls_matching("get pods"), "no reload while modified")
+    vim.cmd("normal! u")
+
+    vim.api.nvim_feedkeys("gw", "mx", false)
+    t.ok(not vim.wo.winbar:find("⟳", 1, true), vim.wo.winbar)
+    vim.wait(300)
+    local stopped = #t.calls_matching("get pods")
+    vim.wait(500)
+    t.eq(stopped, #t.calls_matching("get pods"), "no reload once toggled off")
+  end)
+
+  it("is only for lists", function()
+    local messages = t.capture_notify()
+    open("kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml")
+    vim.api.nvim_feedkeys("gw", "mx", false)
+    t.eq("Only resource lists can be watched", messages[#messages].msg)
+  end)
+end)
+
+describe("language server", function()
+  it("attaches to kube buffers", function()
+    open("kube://namespaces/ns1/pods")
+    wait_lsp()
+    t.eq(
+      { "kube" },
+      vim.tbl_map(function(client)
+        return client.name
+      end, vim.lsp.get_clients({ bufnr = 0 }))
+    )
+  end)
+
+  it("lists the resources as document symbols", function()
+    open("kube://namespaces/ns1/pods")
+    wait_lsp()
+    local result = vim.lsp.buf_request_sync(0, "textDocument/documentSymbol", {
+      textDocument = vim.lsp.util.make_text_document_params(0),
+    }, 2000)
+    local symbols = vim.tbl_map(function(symbol)
+      return { symbol.name, symbol.detail, symbol.range.start.line }
+    end, result[next(result)].result)
+    t.eq({ { "web-1", "ns1", 0 }, { "web-2", "ns1", 1 } }, symbols)
+  end)
+
+  it("definition is what the cell under the cursor refers to", function()
+    open("kube://pods")
+    wait_lsp()
+    t.press_on("ns1", "")
+    local params = vim.lsp.util.make_position_params(0, "utf-16")
+    local result = vim.lsp.buf_request_sync(0, "textDocument/definition", params, 2000)
+    t.eq(PODS, result[next(result)].result.uri)
+  end)
+end)

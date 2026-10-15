@@ -1,16 +1,26 @@
 #!/bin/sh
 # Fake kubectl for tests: records the arguments and replies with the first rule
 # (shell glob on the arguments) registered via `require("helpers").respond`.
-printf '%s\n' "$*" >> "$KUBE_TEST_DIR/calls"
+printf '%s\n' "$*" >> "$KUBE_TEST_DIR/raw_calls"
+
+# Record and match without --request-timeout, which nearly every call has
+args=""
+for arg in "$@"; do
+  case "$arg" in
+    --request-timeout=*) ;;
+    *) args="${args:+$args }$arg" ;;
+  esac
+done
+printf '%s\n' "$args" >> "$KUBE_TEST_DIR/calls"
 
 if [ -f "$KUBE_TEST_DIR/rules" ]; then
   while IFS='	' read -r pattern script; do
     # shellcheck disable=SC2254
-    case "$*" in
+    case "$args" in
       $pattern) exec sh "$script" ;;
     esac
   done < "$KUBE_TEST_DIR/rules"
 fi
 
-echo "fake kubectl: no rule for: $*" >&2
+echo "fake kubectl: no rule for: $args" >&2
 exit 1

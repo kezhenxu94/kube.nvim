@@ -69,6 +69,10 @@ function M.prompt_port_forward(context, ports, kind, name, namespace)
           _G.portforwards[key][local_port] = {
             container_port = port.port,
             job = job,
+            context = context,
+            namespace = namespace,
+            resource_type = kind,
+            name = name,
           }
         end
 

@@ -78,6 +78,31 @@ describe("kubectl", function()
       t.eq({ "get pods -o json --all-namespaces" }, t.calls())
     end)
 
+    it("scale, rollout, node operations and patch", function()
+      run(kubectl.scale, "ctx", "deployment.apps", "web", "ns1", 3)
+      run(kubectl.rollout, "ctx", "restart", "statefulset.apps", "db", "ns1")
+      run(kubectl.node, "ctx", "cordon", "node-1")
+      run(kubectl.node, "ctx", "drain", "node-1")
+      run(kubectl.patch, "ctx", "secret", "db", "ns1", { data = { a = vim.NIL } })
+      t.eq({
+        "--context ctx scale deployment.apps/web --replicas=3 -n ns1",
+        "--context ctx rollout restart statefulset.apps/db -n ns1",
+        "--context ctx cordon node-1",
+        "--context ctx drain node-1 --ignore-daemonsets --delete-emptydir-data",
+        '--context ctx patch secret db --type=merge -p {"data":{"a":null}} -n ns1',
+      }, t.calls())
+    end)
+
+    it("sets a request timeout except for streams", function()
+      run(kubectl.get, "ctx", "pods", nil, "ns1", nil)
+      run(kubectl.forward_port, "ctx", "pod", "web-1", "ns1", 8080, 18080)
+      run(kubectl.node, "ctx", "drain", "node-1")
+      local raw = t.calls(true)
+      t.ok(raw[1]:find("--request-timeout=30s", 1, true), raw[1])
+      t.ok(not raw[2]:find("--request-timeout", 1, true), raw[2])
+      t.ok(not raw[3]:find("--request-timeout", 1, true), raw[3])
+    end)
+
     it("keeps arguments with spaces intact", function()
       run(kubectl.get, "my ctx", "pods", nil, "ns1", { selector = "env in (a, b)" })
       t.eq(1, #t.calls_matching("^%-%-context my ctx get pods %-o json %-n ns1 %-%-selector=env in %(a, b%)$"))
@@ -133,6 +158,17 @@ describe("kubectl", function()
       t.eq({}, out.errors)
     end)
 
+    it("diff treats exit code 1 (differences) as success", function()
+      t.respond("*diff*", { stdout = "-a\n+b\n", code = 1 })
+      t.eq("-a\n+b\n", run(kubectl.diff, "ctx", "ns1", "/tmp/x.yaml").result)
+      t.respond("*diff*", { stdout = "", code = 0 })
+      t.eq("", run(kubectl.diff, "ctx", "ns1", "/tmp/x.yaml").result)
+      t.respond("*diff*", { stderr = "error: invalid object", code = 2 })
+      local out = run(kubectl.diff, "ctx", "ns1", "/tmp/x.yaml")
+      t.eq(nil, out.result)
+      t.eq({ "error: invalid object" }, out.errors)
+    end)
+
     it("runs callbacks on the main loop", function()
       t.respond("*", { stdout = "ok" })
       local fast
@@ -150,20 +186,42 @@ describe("kubectl", function()
     it("returns the whole output without the trailing newline", function()
       t.respond("*logs*", { stdout = "line1\nline2\n" })
       local lines
-      kubectl.logs("ctx", "pod", "web-1", "app", "ns1", false, function(data)
+      kubectl.logs("ctx", "pod", "web-1", "ns1", { container = "app" }, function(data)
         lines = data
       end)
       t.wait_for(function()
         return lines
       end)
       t.eq("line1\nline2", lines)
-      t.eq({ "--context ctx logs pod/web-1 -c app -n ns1" }, t.calls())
+      t.eq({ "--context ctx logs pod/web-1 -c app -n ns1 --tail=1000" }, t.calls())
+    end)
+
+    it("passes previous, all containers, since and tail", function()
+      t.respond("*logs*", { stdout = "x" })
+      local done = false
+      kubectl.logs(
+        "ctx",
+        "deployment.apps",
+        "web",
+        "ns1",
+        { previous = true, all_containers = true, since = "1h", tail = -1 },
+        function()
+          done = true
+        end
+      )
+      t.wait_for(function()
+        return done
+      end)
+      t.eq(
+        { "--context ctx logs deployment.apps/web -n ns1 --tail=-1 --previous --all-containers --since=1h" },
+        t.calls()
+      )
     end)
 
     it("shows errors in place of the logs", function()
       t.respond("*logs*", { stderr = "container not found", code = 1 })
       local lines
-      kubectl.logs("ctx", "pod", "web-1", nil, "ns1", false, function(data)
+      kubectl.logs("ctx", "pod", "web-1", "ns1", {}, function(data)
         lines = data
       end)
       t.wait_for(function()
@@ -175,20 +233,20 @@ describe("kubectl", function()
     it("streams complete lines when following", function()
       t.respond("*logs*", { script = "printf 'a\\nb'; sleep 0.2; printf 'c\\nd\\n'" })
       local chunks = {}
-      local job = kubectl.logs("ctx", "pod", "web-1", nil, "ns1", true, function(data)
+      local job = kubectl.logs("ctx", "pod", "web-1", "ns1", { follow = true }, function(data)
         table.insert(chunks, data)
       end)
       t.wait_for(function()
         return job:is_closing() and #chunks == 2
       end, "log chunks")
       t.eq({ "a", "bc\nd" }, chunks)
-      t.eq({ "--context ctx logs pod/web-1 -n ns1 -f" }, t.calls())
+      t.eq({ "--context ctx logs pod/web-1 -n ns1 --tail=1000 -f" }, t.calls())
     end)
 
     it("flushes a final partial line when the stream ends", function()
       t.respond("*logs*", { script = "printf 'a\\nb'" })
       local chunks = {}
-      kubectl.logs("ctx", "pod", "web-1", nil, "ns1", true, function(data)
+      kubectl.logs("ctx", "pod", "web-1", "ns1", { follow = true }, function(data)
         table.insert(chunks, data)
       end)
       t.wait_for(function()

@@ -2,7 +2,10 @@
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
 vim.opt.rtp:prepend(root)
 package.path = string.format("%s/tests/?.lua;%s", root, package.path)
-vim.env.PATH = root .. "/tests/bin:" .. vim.env.PATH
+-- The end-to-end tests use the real kubectl against a kind cluster
+if not vim.env.KUBE_E2E_CONTEXT then
+  vim.env.PATH = root .. "/tests/bin:" .. vim.env.PATH
+end
 vim.env.KUBE_TEST_DIR = vim.fn.tempname()
 vim.fn.mkdir(vim.env.KUBE_TEST_DIR, "p")
 

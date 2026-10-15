@@ -19,7 +19,7 @@ function M.setup()
 
       -- Without `context/<context>/` the buffer is for the current context, pin it so it
       -- keeps operating on the same cluster after the context is switched.
-      if not vim.startswith(buf_name, "kube://context/") then
+      if not vim.startswith(buf_name, "kube://context/") and buf_name ~= "kube://portforwards" then
         local context = require("kubectl").get_current_context()
         if not context then
           vim.notify("No current kubectl context", vim.log.levels.ERROR)
@@ -76,7 +76,19 @@ function M.setup()
             buffer:load()
           end)
         end
-      end)
+      end, { force = vim.v.cmdbang == 1 })
+    end,
+  })
+
+  autocmd("BufWinEnter", {
+    group = "kube_autocmds",
+    pattern = "kube://*",
+    callback = function(ev)
+      local buffer = _G.kube_buffers[ev.buf]
+      -- Wrapped rows break the table layout and its alignment with the winbar header
+      if buffer and require("kube.refresh").is_table(buffer) then
+        vim.wo[0][0].wrap = false
+      end
     end,
   })
 
@@ -96,7 +108,7 @@ function M.setup()
         return
       end
 
-      vim.wo.winbar = utils.get_winbar(buffer.buf_nr)
+      utils.update_winbar(buffer)
     end,
   })
 

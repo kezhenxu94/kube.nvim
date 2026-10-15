@@ -22,6 +22,7 @@ local actions = {
   statefulset = require("kube.actions.statefulset"),
   replicaset = require("kube.actions.replicaset"),
   service = require("kube.actions.service"),
+  secret = require("kube.actions.secret"),
 }
 
 local non_object_rows = { container = true, containers = true, portforward = true }

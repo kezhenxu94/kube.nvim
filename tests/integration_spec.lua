@@ -29,6 +29,21 @@ local function wait_buf_name(name)
   end, "buffer " .. name .. ", current: " .. buf_name())
 end
 
+---@param text string
+---@return integer win The floating window showing text
+local function wait_float(text)
+  local found
+  t.wait_for(function()
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), 0, -1, false)
+      if vim.api.nvim_win_get_config(win).relative ~= "" and table.concat(lines, "\n"):find(text, 1, true) then
+        found = win
+        return true
+      end
+    end
+  end, "a float with " .. text)
+  return found
+end
 local PODS = "kube://context/ctx-a/namespaces/ns1/pods"
 
 before_each(function()
@@ -150,9 +165,9 @@ describe("resource under the cursor", function()
     t.wait_loaded()
     t.ok(t.lines()[1]:find("web-2", 1, true), "list is reordered")
 
-    vim.api.nvim_win_set_cursor(0, { 1, 0 })
-    vim.api.nvim_feedkeys("K", "mx", false)
-    wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-2")
+    vim.api.nvim_win_set_cursor(0, { 1, assert(t.lines()[1]:find("web-2", 1, true)) - 1 })
+    vim.api.nvim_feedkeys("gd", "mx", false)
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-2?output=yaml")
   end)
 
   it("keeps the cursor on the same resource when reloading", function()
@@ -204,14 +219,12 @@ describe("actions", function()
     t.eq(1, #t.calls_matching("%-%-selector=app=web,tier=frontend$"))
   end)
 
-  it("describes with the group-qualified type", function()
+  it("K describes in a hover with the group-qualified type", function()
     open("kube://namespaces/ns1/deployments")
     t.press_on("web", "K")
-    wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployment.apps/web")
-    t.wait_loaded()
+    local float = wait_float("Name: web")
     t.eq({ "--context ctx-a describe deployment.apps web -n ns1" }, t.calls_matching("describe"))
-    t.eq({ "Name: web" }, t.lines())
-    t.eq(false, vim.bo.modifiable)
+    vim.api.nvim_win_close(float, true)
   end)
 
   it("goes to the editable YAML definition", function()
@@ -235,8 +248,9 @@ describe("actions", function()
     t.press_on("web", "gd")
     wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml")
     t.wait_loaded()
-    t.eq({ "Failed to get resource YAML" }, t.lines())
+    t.eq({ "" }, t.lines())
     t.eq(false, vim.bo.modifiable)
+    t.eq("✗ forbidden", t.status())
   end)
 
   it("opens port forward URLs with gx", function()
@@ -274,7 +288,7 @@ describe("actions", function()
       return t.lines()[1] == "line1"
     end, "logs")
     t.eq({ "line1", "line2" }, t.lines())
-    t.eq({ "--context ctx-a logs pod/web-1 -n ns1" }, t.calls_matching("logs"))
+    t.eq({ "--context ctx-a logs pod/web-1 -n ns1 --tail=1000" }, t.calls_matching("logs"))
   end)
 
   it("shows container logs", function()
@@ -285,7 +299,7 @@ describe("actions", function()
     t.press_on("sidecar", "gl")
     wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?container=sidecar")
     wait_call("logs")
-    t.eq({ "--context ctx-a logs pod/web-1 -c sidecar -n ns1" }, t.calls_matching("logs"))
+    t.eq({ "--context ctx-a logs pod/web-1 -c sidecar -n ns1 --tail=1000" }, t.calls_matching("logs"))
   end)
 
   it("follows logs and stops on <C-c>", function()
@@ -375,8 +389,8 @@ describe("actions", function()
     t.press_on("web-1", "<CR>")
     wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-1/containers")
     t.wait_loaded()
-    t.press_on("app", "K")
-    t.eq({ msg = "describe is not supported for containers", level = vim.log.levels.WARN }, messages[#messages])
+    t.press_on("app", "gi")
+    t.eq({ msg = "set_image is not supported for containers", level = vim.log.levels.WARN }, messages[#messages])
   end)
 
   it("shows the help with the configured keymaps", function()
@@ -461,6 +475,12 @@ describe("navigation", function()
     t.eq({ "--context ctx-a describe node node-1" }, t.calls_matching("describe"))
   end)
 
+  it("gd jumps like <C-]>", function()
+    open("kube://pods")
+    t.press_on("ns1", "gd")
+    wait_buf_name(PODS)
+  end)
+
   it("<C-]> elsewhere goes to the definition", function()
     open("kube://namespaces/ns1/pods")
     t.press_on("Running", "<C-]>")
@@ -515,6 +535,13 @@ describe("editing YAML", function()
     t.wait_loaded()
     t.eq(true, vim.bo.modifiable)
   end
+
+  before_each(function()
+    t.respond("*diff*", { stdout = "-  replicas: 2\n+  replicas: 3\n", code = 1 })
+    t.answer_prompts(function()
+      return "Yes"
+    end)
+  end)
 
   it("applies once per save, however often the buffer was refreshed", function()
     t.respond("*apply*", { stdout = "configured" })

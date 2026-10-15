@@ -1,5 +1,8 @@
 ---@class KubeConfig
 ---@field keymaps table<string, string>|nil
+---@field refresh_interval integer|false|nil
+---@field request_timeout string|nil
+---@field logs {tail: integer}|nil
 ---@field highlights Highlights|nil
 local M = {}
 
@@ -14,6 +17,7 @@ function M.defaults()
       describe = "K",
       parent = "-",
       refresh = "R",
+      watch = "gw",
       show_logs = "gl",
       follow_logs = "gL",
       port_forward = "gF",
@@ -22,6 +26,14 @@ function M.defaults()
       exec = "gs",
       quit = "q",
       help = "g?",
+    },
+    -- How often watched lists (toggled with `gw`) reload, in milliseconds, false to disable watching
+    refresh_interval = 10000,
+    -- kubectl --request-timeout for everything except streams (logs -f, port-forward, exec, drain)
+    request_timeout = "30s",
+    logs = {
+      -- Number of lines to fetch, -1 for all
+      tail = 1000,
     },
   }
 end

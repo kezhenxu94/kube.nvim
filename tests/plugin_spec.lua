@@ -1,0 +1,73 @@
+-- Loads the plugin like Neovim does, without calling setup()
+local t = require("helpers")
+
+local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+vim.cmd.runtime("plugin/kube.lua")
+
+describe("plugin/kube.lua", function()
+  after_each(function()
+    t.restore_stubs()
+  end)
+
+  it("defines :Kube without setup()", function()
+    t.eq(2, vim.fn.exists(":Kube"))
+  end)
+
+  it("opens kube buffers without setup()", function()
+    t.reset_kubectl()
+    t.respond("*config current-context*", { stdout = "ctx-a\n" })
+    t.respond("*get pods -o json*", { fixture = "pods.json" })
+    t.capture_notify()
+    vim.cmd.edit("kube://pods")
+    t.wait_loaded()
+    t.eq(2, #t.lines())
+    t.clean_buffers()
+  end)
+
+  it("is loaded once", function()
+    vim.cmd.runtime("plugin/kube.lua")
+    t.eq(1, #vim.api.nvim_get_autocmds({ group = "kube_autocmds", event = "BufReadCmd" }))
+  end)
+
+  it("keeps highlight overrides across colorschemes", function()
+    require("kube").setup({ highlights = { KubeHeader = { fg = "#123456" } } })
+    vim.cmd.colorscheme("default")
+    t.eq(tonumber("123456", 16), vim.api.nvim_get_hl(0, { name = "KubeHeader" }).fg)
+  end)
+end)
+
+describe("help", function()
+  it("has valid tags", function()
+    local doc = vim.fn.tempname()
+    vim.fn.mkdir(doc .. "/doc", "p")
+    vim.fn.writefile(vim.fn.readfile(root .. "/doc/kube.txt"), doc .. "/doc/kube.txt")
+    vim.cmd.helptags(doc .. "/doc")
+    vim.opt.rtp:append(doc)
+    vim.cmd.help("kube.nvim")
+    t.eq("kube.txt", vim.fn.expand("%:t"))
+    vim.cmd.help("kube-jump")
+    vim.cmd.close()
+  end)
+end)
+
+describe(":checkhealth kube", function()
+  it("reports kubectl, the context and the cluster", function()
+    t.reset_kubectl()
+    t.respond("*config current-context*", { stdout = "ctx-a\n" })
+    t.respond("version --client -o json", { stdout = '{"clientVersion":{"gitVersion":"v1.31.0"}}' })
+    t.respond("--context ctx-a version -o json", { stdout = "{}" })
+    vim.cmd("checkhealth kube")
+    local text = ""
+    t.wait_for(function()
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.bo[buf].filetype == "checkhealth" then
+          text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+        end
+      end
+      return text:find("reachable", 1, true)
+    end, "health report")
+    t.ok(text:find("kubectl v1.31.0", 1, true), text)
+    t.ok(text:find("Context: ctx-a", 1, true), text)
+    t.ok(text:find("The cluster of ctx-a is reachable", 1, true), text)
+  end)
+end)

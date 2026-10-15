@@ -20,9 +20,15 @@ local default_highlights = {
   KubeHeader = { fg = "#df8e1d", bold = true },
 }
 
+---@type Highlights
+local user_highlights = {}
+
+---@param opts {highlights: Highlights|nil}|nil Overrides, kept for later calls without opts (ColorScheme)
 function M.setup(opts)
-  opts = opts or {}
-  local highlights = vim.tbl_deep_extend("force", default_highlights, opts.highlights or {})
+  if opts and opts.highlights then
+    user_highlights = opts.highlights
+  end
+  local highlights = vim.tbl_deep_extend("force", default_highlights, user_highlights)
 
   for group, colors in pairs(highlights) do
     vim.api.nvim_set_hl(0, group, colors)

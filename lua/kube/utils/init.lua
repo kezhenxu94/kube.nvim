@@ -107,31 +107,40 @@ function M.calculate_age(created)
   end
 end
 
-function M.get_winbar(buf_nr)
-  local log = require("kube.log")
-
+---The table header for the winbar of `win`, aligned with its number column and horizontal scroll.
+---@param buf_nr integer
+---@param win integer|nil Defaults to the current window
+---@return string
+function M.get_winbar(buf_nr, win)
+  win = win or vim.api.nvim_get_current_win()
   local buffer = _G.kube_buffers[buf_nr]
   if not buffer or not buffer.header_row then
     return ""
   end
 
   local header_row = buffer.header_row
-  local winbar_padding = ""
-  local wininfo = vim.fn.getwininfo(vim.fn.win_getid())
-  if wininfo and wininfo[1].textoff > 0 then
-    winbar_padding = string.rep(" ", wininfo[1].textoff)
+  local wininfo = vim.fn.getwininfo(win)[1]
+  local winbar_padding = string.rep(" ", wininfo and wininfo.textoff or 0)
+
+  local leftcol = vim.api.nvim_win_call(win, function()
+    return vim.fn.winsaveview().leftcol
+  end)
+  local indicator = ""
+  if buffer.watch then
+    indicator = string.format(" ⟳ %gs ", require("kube.refresh").interval() / 1000)
   end
+  local width = vim.api.nvim_win_get_width(win) - #winbar_padding - vim.fn.strdisplaywidth(indicator)
+  local header = header_row.formatted:sub(leftcol + 1):sub(1, math.max(width, 0))
 
-  local view = vim.fn.winsaveview()
-  local scroll_offset = view.leftcol
-  local truncated_header = header_row.formatted:sub(scroll_offset + 1)
-  log.debug("scroll_offset", scroll_offset, "truncated_header", truncated_header)
+  return string.format("%s%%#%s#%s%%=%%#Comment#%s", winbar_padding, header_row.highlight, header, indicator)
+end
 
-  local winwidth = vim.api.nvim_win_get_width(0)
-  truncated_header = truncated_header:sub(1, winwidth - #winbar_padding)
-  log.debug("winwidth", winwidth, "truncated_header", truncated_header)
-
-  return string.format("%s%%#%s#%s", winbar_padding, header_row.highlight, truncated_header)
+---Update the winbar of every window showing the buffer.
+---@param kbuf KubeBuffer
+function M.update_winbar(kbuf)
+  for _, win in ipairs(vim.fn.win_findbuf(kbuf.buf_nr)) do
+    vim.wo[win].winbar = M.get_winbar(kbuf.buf_nr, win)
+  end
 end
 
 return M

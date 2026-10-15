@@ -16,8 +16,15 @@ local M = {
 
     log.debug("loading log buffer", resource_kind, resource_name, namespace, subresource_kind, params)
 
-    local follow = params.follow
-    local container = params.container
+    local opts = {
+      container = params.container,
+      follow = params.follow == true,
+      previous = params.previous == true,
+      all_containers = params["all-containers"] == true,
+      since = params.since,
+      tail = tonumber(params.tail),
+    }
+    local follow = opts.follow
     ---@type integer|nil
     local status_mark
 
@@ -32,27 +39,28 @@ local M = {
       )
     end
 
-    local job = kubectl.logs(self.context, resource_kind, resource_name, container, namespace, follow, function(result)
+    local job = kubectl.logs(self.context, resource_kind, resource_name, namespace, opts, function(result)
       if not vim.api.nvim_buf_is_valid(self.buf_nr) then
         return
       end
 
       self:setup()
 
-      vim.api.nvim_set_option_value("modifiable", true, { buf = self.buf_nr })
       local lines = vim.split(result, "\n")
-      if follow then
-        -- Replace the trailing placeholder line, then add a new one for the status
-        local start = vim.api.nvim_buf_line_count(self.buf_nr)
-        vim.api.nvim_buf_set_lines(self.buf_nr, start - 1, -1, false, lines)
-        vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "" })
-        set_status("Waiting for new logs... (Ctrl+C to stop)")
-      else
-        vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
+      if not follow then
+        self:set_lines(lines)
+        return
       end
 
-      vim.api.nvim_set_option_value("modifiable", false, { buf = self.buf_nr })
-      vim.api.nvim_set_option_value("modified", false, { buf = self.buf_nr })
+      self:set_status(nil)
+      vim.bo[self.buf_nr].modifiable = true
+      -- Replace the trailing placeholder line, then add a new one for the status
+      local start = vim.api.nvim_buf_line_count(self.buf_nr)
+      vim.api.nvim_buf_set_lines(self.buf_nr, start - 1, -1, false, lines)
+      vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "" })
+      set_status("Waiting for new logs... (Ctrl+C to stop)")
+      vim.bo[self.buf_nr].modifiable = false
+      vim.bo[self.buf_nr].modified = false
     end)
 
     if not job then

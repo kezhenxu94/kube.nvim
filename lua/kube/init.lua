@@ -1,27 +1,31 @@
 ---@class PortForward
 ---@field container_port number The container port to forward
 ---@field job vim.SystemObj The kubectl port-forward job
+---@field context string
+---@field namespace string
+---@field resource_type string
+---@field name string
 
----@type table<string, table<number, PortForward>> -- namespace/pod -> local port -> PortForward
-_G.portforwards = {}
+---@type table<string, table<number, PortForward>> -- context/namespace/type/name -> local port -> PortForward
+_G.portforwards = _G.portforwards or {}
 
 local M = {}
 
----@param opts table|nil
-function M.setup(opts)
-  opts = opts or {}
+local initialized = false
 
-  if vim.fn.has("nvim-0.11") == 0 then
-    vim.notify("kube.nvim requires Neovim >= 0.11", vim.log.levels.ERROR)
+---Define the commands and autocmds, called from plugin/kube.lua so that setup() is optional.
+function M.init()
+  if initialized then
     return
   end
+  initialized = true
 
-  require("kube.config").setup(opts)
-  require("kube.highlights").setup(opts)
+  require("kube.highlights").setup()
   require("kube.autocmds").setup()
   require("kube.commands").setup()
 
   vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = require("kube.autocmds").augroup,
     callback = function()
       local kubectl = require("kubectl")
       for _, buffer in pairs(_G.kube_buffers or {}) do
@@ -39,6 +43,48 @@ function M.setup(opts)
     end,
     desc = "Shutdown all kubectl jobs when exiting vim",
   })
+end
+
+---Configure kube.nvim, optional: see `require("kube.config").defaults()`.
+---@param opts KubeConfig|nil
+function M.setup(opts)
+  opts = opts or {}
+
+  require("kube.config").setup(opts)
+  require("kube.refresh").restart()
+  require("kube.highlights").setup(opts)
+  M.init()
+end
+
+---Apply the current buffer as a manifest to the current context.
+---@param force boolean|nil Skip the diff confirmation
+function M.apply_buffer(force)
+  local context = require("kubectl").get_current_context()
+  local name = vim.fn.expand("%:t")
+  local apply = require("kube.apply")
+  apply.with_temp_file(vim.api.nvim_buf_get_lines(0, 0, -1, false), function(file, cleanup)
+    apply.apply(context, nil, file, {
+      force = force,
+      title = string.format("Apply %s (context: %s)?", name ~= "" and name or "buffer", context),
+    }, cleanup)
+  end)
+end
+
+---Show the diff of the current buffer as a manifest against the current context.
+function M.diff_buffer()
+  local apply = require("kube.apply")
+  apply.with_temp_file(vim.api.nvim_buf_get_lines(0, 0, -1, false), function(file, cleanup)
+    require("kubectl").diff(require("kubectl").get_current_context(), nil, file, function(diff)
+      cleanup()
+      if diff == "" then
+        vim.notify("No changes")
+      elseif diff then
+        apply.show_split(vim.split(vim.trim(diff), "\n"), "diff")
+      end
+    end, function(err)
+      vim.notify("Failed to diff: " .. err, vim.log.levels.ERROR)
+    end)
+  end)
 end
 
 ---@param resource_kind string The resource kind to get

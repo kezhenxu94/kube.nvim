@@ -41,9 +41,10 @@ function M.respond(pattern, opts)
   write_rules()
 end
 
+---@param raw boolean|nil Include --request-timeout
 ---@return string[] The arguments of each kubectl call since the last reset
-function M.calls()
-  local file = dir .. "/calls"
+function M.calls(raw)
+  local file = dir .. (raw and "/raw_calls" or "/calls")
   return vim.fn.filereadable(file) == 1 and vim.fn.readfile(file) or {}
 end
 
@@ -59,12 +60,14 @@ function M.reset_kubectl()
   rules = {}
   write_rules()
   vim.fn.delete(dir .. "/calls")
+  vim.fn.delete(dir .. "/raw_calls")
 end
 
 ---@param fn fun(): any
 ---@param what string|nil Description for the timeout error
-function M.wait_for(fn, what)
-  if not vim.wait(5000, function()
+---@param timeout integer|nil Milliseconds, defaults to 5000
+function M.wait_for(fn, what, timeout)
+  if not vim.wait(timeout or 5000, function()
     return fn() and true or false
   end, 10) then
     error("timed out waiting for " .. (what or "condition"), 2)
@@ -143,13 +146,21 @@ function M.lines(buf)
   return vim.api.nvim_buf_get_lines(buf or 0, 0, -1, false)
 end
 
+---@param buf integer|nil
+---@return string|nil The status shown after the first line, see KubeBuffer:set_status
+function M.status(buf)
+  local marks =
+    vim.api.nvim_buf_get_extmarks(buf or 0, require("kube.constants").KUBE_STATUS_NAMESPACE, 0, -1, { details = true })
+  return marks[1] and marks[1][4].virt_text[1][1]
+end
 ---Wait for the current kube buffer to finish loading.
-function M.wait_loaded()
+---@param timeout integer|nil
+function M.wait_loaded(timeout)
   local buf = vim.api.nvim_get_current_buf()
   M.wait_for(function()
     local kbuf = _G.kube_buffers[buf]
     return kbuf and kbuf.loading_job and kbuf.loading_job:is_closing()
-  end, "buffer to load")
+  end, "buffer to load", timeout)
   -- Let the scheduled render callback run
   vim.wait(20)
 end

@@ -100,13 +100,13 @@ describe("utils.get_winbar", function()
     vim.wo.signcolumn = "no"
     local buf = vim.api.nvim_get_current_buf()
     _G.kube_buffers = { [buf] = { header_row = { formatted = "NAME  AGE", highlight = "KubeHeader" } } }
-    t.eq("%#KubeHeader#NAME  AGE", utils.get_winbar(buf))
+    t.eq("%#KubeHeader#NAME  AGE%=%#Comment#", utils.get_winbar(buf))
   end)
 
   it("pads for the number column", function()
     vim.wo.number = true
     local buf = vim.api.nvim_get_current_buf()
     _G.kube_buffers = { [buf] = { header_row = { formatted = "NAME", highlight = "KubeHeader" } } }
-    t.ok(utils.get_winbar(buf):match("^ +%%#KubeHeader#NAME$"))
+    t.ok(utils.get_winbar(buf):match("^ +%%#KubeHeader#NAME%%=%%#Comment#$"), utils.get_winbar(buf))
   end)
 end)

@@ -1,7 +1,7 @@
 local M = {}
 
 ---@class CommandBase
----@field parse fun(args: string[]): table Parse command arguments into parameters
+---@field parse fun(args: string[], opts: table): table Parse command arguments (and the user command opts) into parameters
 ---@field complete fun(arglead: string, args: string[]): string[] Provide completions for the command
 local CommandBase = {}
 
@@ -99,10 +99,36 @@ local ContextCommand = {
   end,
 }
 
+---Commands on the current buffer as a manifest; `:Kube! apply` skips the confirmation.
+---@type CommandBase
+local ManifestCommand = {
+  parse = function(_, opts)
+    return { opts.bang }
+  end,
+
+  complete = function()
+    return {}
+  end,
+}
+
+---@type CommandBase
+local NoArgsCommand = {
+  parse = function()
+    return {}
+  end,
+
+  complete = function()
+    return {}
+  end,
+}
+
 M.command_handlers = {
   get = GetCommand,
   delete = DeleteCommand,
   context = ContextCommand,
+  apply = ManifestCommand,
+  diff = ManifestCommand,
+  portforwards = NoArgsCommand,
 }
 
 function M.setup()
@@ -116,10 +142,11 @@ function M.setup()
       return
     end
 
-    local parsed = handler.parse(args)
+    local parsed = handler.parse(args, opts)
     M.commands[command](unpack(parsed))
   end, {
     nargs = "*",
+    bang = true,
     complete = function(arglead, cmdline)
       local args = vim.split(cmdline, " ", { trimempty = false })
       table.remove(args, 1) -- Remove the command name "Kube"
@@ -152,6 +179,18 @@ M.commands = {
 
   context = function(...)
     require("kube").ctx(...)
+  end,
+
+  apply = function(force)
+    require("kube").apply_buffer(force)
+  end,
+
+  diff = function()
+    require("kube").diff_buffer()
+  end,
+
+  portforwards = function()
+    vim.cmd.edit("kube://portforwards")
   end,
 }
 
