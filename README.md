@@ -101,7 +101,7 @@ require("kube").setup({
   request_timeout = "30s",
   logs = { tail = 1000 }, -- -1 for all
   -- Highlight overrides, by default linked to your colorscheme's groups:
-  -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (DiagnosticOk),
+  -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (Normal),
   -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title)
   -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
   highlights = {},

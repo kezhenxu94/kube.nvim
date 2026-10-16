@@ -166,7 +166,7 @@ Defaults: >lua
       logs = { tail = 1000 }, -- -1 for all
       -- Overrides, by default linked to your colorscheme's groups:
       -- KubeBody (Normal), KubePending (DiagnosticWarn),
-      -- KubeRunning (DiagnosticOk), KubeFailed (DiagnosticError),
+      -- KubeRunning (Normal), KubeFailed (DiagnosticError),
       -- KubeSucceeded, KubeUnknown (Comment), KubeHeader (Title)
       -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
       highlights = {},

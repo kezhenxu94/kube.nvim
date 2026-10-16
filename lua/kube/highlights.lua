@@ -14,7 +14,7 @@ local M = {}
 local default_highlights = {
   KubeBody = { link = "Normal" },
   KubePending = { link = "DiagnosticWarn" },
-  KubeRunning = { link = "DiagnosticOk" },
+  KubeRunning = { link = "Normal" },
   KubeFailed = { link = "DiagnosticError" },
   KubeSucceeded = { link = "Comment" },
   KubeUnknown = { link = "Comment" },
