@@ -137,7 +137,16 @@ Operations changing the cluster ask for confirmation, naming the context.
 ==============================================================================
 6. Editing                                                      *kube-editing*
 
-Lists: delete lines and |:w| to delete those resources, after confirming.
+Lists: delete lines and |:w| to delete those resources, after confirming. The
+deleted lines stay visible, as virtual lines, until written or undone.
+
+Edit cells and |:w| to apply them, after confirming all changes; |:w!|
+without confirming:
+    DESIRED     deployments, statefulsets, replicasets: scale
+    IMAGE       containers of a pod: set the image
+    SUSPENDED   cron jobs: `true` or `false`
+
+Watched lists (`gw`) highlight the lines a reload changed for a moment.
 
 YAML (`gd`): |:w| shows `kubectl diff` and applies after confirming. |:w!|
 applies without confirming.
@@ -167,7 +176,8 @@ Defaults: >lua
       -- Overrides, by default linked to your colorscheme's groups:
       -- KubeBody (Normal), KubePending (DiagnosticWarn),
       -- KubeRunning (Normal), KubeFailed (DiagnosticError),
-      -- KubeSucceeded, KubeUnknown (Comment), KubeHeader (Title)
+      -- KubeSucceeded, KubeUnknown (Comment), KubeHeader (Title),
+      -- KubeDeleted (DiffDelete), KubeChanged (DiffChange)
       -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
       highlights = {},
     })

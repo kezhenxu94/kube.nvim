@@ -7,6 +7,7 @@
       "kind": "Deployment",
       "metadata": { "name": "web", "namespace": "ns1", "creationTimestamp": "2026-01-01T00:00:00Z" },
       "spec": {
+        "replicas": 3,
         "selector": { "matchLabels": { "tier": "frontend", "app": "web" } },
         "template": { "spec": { "containers": [{ "name": "app", "image": "web:1", "ports": [{ "containerPort": 8080 }] }] } }
       },

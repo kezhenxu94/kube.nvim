@@ -1,8 +1,10 @@
+local edits = require("kube.edits")
 local utils = require("kube.utils")
 
 ---@type Formatter
 local M = {
   headers = { "NAMESPACE", "NAME", "SCHEDULE", "SUSPENDED", "LAST SCHEDULE", "AGE" },
+  editable = { SUSPENDED = edits.suspend },
 
   format = function(data)
     local rows = {}
@@ -12,7 +14,7 @@ local M = {
           item.metadata.namespace,
           item.metadata.name,
           item.spec.schedule,
-          tostring(item.spec.suspend),
+          tostring(item.spec.suspend == true),
           item.status.lastScheduleTime or "<none>",
           utils.calculate_age(item.metadata.creationTimestamp),
         },

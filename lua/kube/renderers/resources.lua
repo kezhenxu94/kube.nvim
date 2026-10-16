@@ -62,9 +62,66 @@ local function restore_cursors(saved, formatted_rows)
   end
 end
 
+-- Columns that change on every reload, not worth showing as a change
+local VOLATILE_COLUMNS = { AGE = true, ["LAST SEEN"] = true }
+local FLASH_DURATION = 1500
+
+---@param headers string[]
+---@param cells string[]
+---@return string
+local function row_signature(headers, cells)
+  local values = {}
+  for i, header in ipairs(headers) do
+    if not VOLATILE_COLUMNS[header] then
+      table.insert(values, cells[i] or "")
+    end
+  end
+  return table.concat(values, "\0")
+end
+
+---The signatures of the rendered rows by identity, nil before the first render.
+---@param buffer KubeBuffer
+---@return table<string, string>|nil
+local function signatures(buffer)
+  if vim.tbl_isempty(buffer.mark_mappings) then
+    return nil
+  end
+  local result = {}
+  for _, marked_line in pairs(buffer.mark_mappings) do
+    local identity = row_identity(marked_line.item)
+    if identity then
+      result[identity] = marked_line.signature
+    end
+  end
+  return result
+end
+
+---Highlight the rows for a moment.
+---@param buffer KubeBuffer
+---@param rows integer[] 0-indexed
+local function flash(buffer, rows)
+  for _, row in ipairs(rows) do
+    vim.api.nvim_buf_set_extmark(buffer.buf_nr, constants.KUBE_CHANGED_NAMESPACE, row, 0, {
+      line_hl_group = "KubeChanged",
+      priority = vim.hl.priorities.user,
+    })
+  end
+  if #rows == 0 then
+    return
+  end
+  local generation = (buffer.flash_generation or 0) + 1
+  buffer.flash_generation = generation
+  vim.defer_fn(function()
+    -- A later reload flashes its own rows
+    if buffer.flash_generation == generation and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+      vim.api.nvim_buf_clear_namespace(buffer.buf_nr, constants.KUBE_CHANGED_NAMESPACE, 0, -1)
+    end
+  end, FLASH_DURATION)
+end
+
 ---@param buffer KubeBuffer The buffer to render into
 ---@return Formatter
-local function formatter_for(buffer)
+function M.formatter_for(buffer)
   if buffer.subresource_kind and formatters[buffer.subresource_kind] then
     return formatters[buffer.subresource_kind]
   end
@@ -83,7 +140,7 @@ function M.load(buffer)
     buffer.params,
     function(result)
       if result and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
-        M.render(buffer, formatter_for(buffer), vim.json.decode(result))
+        M.render(buffer, M.formatter_for(buffer), vim.json.decode(result))
       end
     end,
     buffer:on_error()
@@ -108,9 +165,12 @@ function M.render(buffer, formatter, data)
   end
   local headers = formatter.headers
   local cursors = save_cursors(self)
+  local previous = signatures(self)
 
   vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_NAMESPACE, 0, -1)
   vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, 0, -1)
+  vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_PENDING_NAMESPACE, 0, -1)
+  vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_CHANGED_NAMESPACE, 0, -1)
   vim.diagnostic.reset(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr)
   self.mark_mappings = {}
   self.mark_columns = {}
@@ -135,28 +195,42 @@ function M.render(buffer, formatter, data)
   end
 
   local diagnostics = {}
+  local changed = {}
   for row_num, row in ipairs(formatted_rows) do
+    local row_mark
     if row.raw then
-      local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
+      row_mark = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_NAMESPACE, row_num - 1, 0, {
         invalidate = true,
-        line_hl_group = row.highlight or "KubeBody",
+        line_hl_group = "KubeBody",
       })
-      self.mark_mappings[mark_id] = {
+      local signature = row_signature(headers, row.cells)
+      self.mark_mappings[row_mark] = {
         item = row.raw,
+        line = row.formatted,
+        signature = signature,
       }
+      local identity = row_identity(row.raw)
+      if previous and identity and previous[identity] ~= signature then
+        table.insert(changed, row_num - 1)
+      end
     end
 
     local col_pos = 0
     for i, col_width in ipairs(col_widths) do
       -- Same widths and separator as `align_row`
       local width = math.min(MAX_COLUMN_WIDTH, col_width)
+      -- Text typed at either end of the cell, as by `ciw`, stays in the cell
       local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
         end_col = col_pos + width,
-        invalidate = true,
+        right_gravity = false,
+        end_right_gravity = true,
+        hl_group = row.highlights and row.highlights[headers[i]],
       })
       self.mark_columns[mark_id] = {
         item = row.raw,
         column = headers[i],
+        text = vim.trim(row.formatted:sub(col_pos + 1, col_pos + width)),
+        row_mark = row_mark,
       }
       col_pos = col_pos + width + #COLUMN_SEPARATOR
     end
@@ -175,11 +249,56 @@ function M.render(buffer, formatter, data)
   if #diagnostics > 0 then
     vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr, diagnostics, {})
   end
+  -- Only reloads of a watched list: a reload asked for shows the changes it was asked for
+  if self.silent then
+    flash(self, changed)
+  end
+end
+
+---Show the rows deleted from the buffer, which `:w` deletes, where they were.
+---@param buffer KubeBuffer
+function M.show_pending(buffer)
+  local buf = buffer.buf_nr
+  vim.api.nvim_buf_clear_namespace(buf, constants.KUBE_PENDING_NAMESPACE, 0, -1)
+
+  -- Marks are created in the order of the rows
+  local ids = vim.tbl_keys(buffer.mark_mappings)
+  table.sort(ids)
+  local deleted = {}
+  for _, id in ipairs(ids) do
+    local mark = vim.api.nvim_buf_get_extmark_by_id(buf, constants.KUBE_NAMESPACE, id, { details = true })
+    if mark[3] and mark[3].invalid then
+      deleted[mark[1]] = deleted[mark[1]] or {}
+      table.insert(deleted[mark[1]], { { buffer.mark_mappings[id].line, "KubeDeleted" } })
+    end
+  end
+
+  local last = vim.api.nvim_buf_line_count(buf) - 1
+  for row, virt_lines in pairs(deleted) do
+    vim.api.nvim_buf_set_extmark(buf, constants.KUBE_PENDING_NAMESPACE, math.min(row, last), 0, {
+      virt_lines = virt_lines,
+      -- Rows deleted at the end go below the last line
+      virt_lines_above = row <= last,
+    })
+  end
+
+  -- Lines above the first line are only shown as filler of the top line
+  if deleted[0] then
+    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+      vim.api.nvim_win_call(win, function()
+        if vim.fn.line("w0") == 1 then
+          vim.fn.winrestview({ topfill = #deleted[0] })
+        end
+      end)
+    end
+  end
 end
 
 ---@class FormattedTableRow
 ---@field formatted string The formatted line with proper column spacing
----@field highlight string|nil The highlight group to apply to the row
+---@field cells string[] The values of the columns
+---@field highlights table<string, string>|nil Highlight groups of cells, by header
+---@field highlight string|nil The highlight group of the header row
 ---@field raw table The original row data
 ---@field diagnostics vim.Diagnostic[]|nil List of diagnostics for the row
 
@@ -202,7 +321,8 @@ function M.format_table(headers, rows)
   for _, row in ipairs(rows) do
     table.insert(formatted_rows, {
       formatted = M.align_row(row.row, col_widths),
-      highlight = row.row.highlight,
+      cells = row.row,
+      highlights = row.highlights,
       diagnostics = row.diagnostics,
       raw = row.item,
     })

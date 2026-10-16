@@ -172,6 +172,23 @@ describe("kind cluster", function()
     t.ok(k({ "rollout", "status", "deployment/web", "--timeout=120s" }).code == 0, "rollout after restart")
   end)
 
+  it("scales by editing the DESIRED cell", function()
+    open(list("deployments"))
+    answer_yes()
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    for id, cell in pairs(kbuf.mark_columns) do
+      if cell.column == "DESIRED" and cell.item.metadata.name == "web" then
+        local mark = vim.api.nvim_buf_get_extmark_by_id(0, require("kube.constants").KUBE_COLUMN_NAMESPACE, id, {})
+        vim.api.nvim_win_set_cursor(0, { mark[1] + 1, mark[2] })
+      end
+    end
+    vim.api.nvim_feedkeys(vim.keycode("ciw2<Esc>"), "mx", false)
+    vim.cmd.write()
+    t.wait_for(function()
+      return jsonpath({ "get", "deployment", "web", "-o", "jsonpath={.spec.replicas}" }) == "2"
+    end, "replicas to be 2", TIMEOUT)
+  end)
+
   it("decodes and updates secrets", function()
     open(list("secrets"))
     t.press_on("db", "<CR>")

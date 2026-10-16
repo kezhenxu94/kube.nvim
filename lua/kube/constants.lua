@@ -5,5 +5,7 @@ M.KUBE_COLUMN_NAMESPACE = vim.api.nvim_create_namespace("kube_column")
 
 M.KUBE_DIAGNOSTICS_NAMESPACE = vim.api.nvim_create_namespace("kube_diagnostics")
 M.KUBE_STATUS_NAMESPACE = vim.api.nvim_create_namespace("kube_status")
+M.KUBE_PENDING_NAMESPACE = vim.api.nvim_create_namespace("kube_pending")
+M.KUBE_CHANGED_NAMESPACE = vim.api.nvim_create_namespace("kube_changed")
 
 return M

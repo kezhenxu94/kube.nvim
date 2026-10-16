@@ -9,10 +9,14 @@ _G.kube_buffers = {}
 
 ---@class MarkedLine
 ---@field item table The raw data of the resource in buffer
+---@field line string The rendered line
+---@field signature string The values of the row that a reload can change
 
 ---@class MarkedColumn
 ---@field item table The raw data of the resource in buffer
 ---@field column string The column name of the marked column
+---@field text string The rendered value, to tell edits
+---@field row_mark integer|nil The mark of the row in `mark_mappings`
 
 ---@class KubeBuffer
 ---@field buf_nr number The buffer number
@@ -30,6 +34,7 @@ _G.kube_buffers = {}
 ---@field loading_job vim.SystemObj|nil The currently running loading job
 ---@field silent boolean|nil Whether the current load is a background refresh
 ---@field watch boolean|nil Whether the buffer reloads periodically, see `kube.refresh`
+---@field flash_generation integer|nil The latest reload whose changed rows are highlighted
 local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer
 

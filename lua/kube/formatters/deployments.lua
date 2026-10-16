@@ -1,8 +1,10 @@
+local edits = require("kube.edits")
 local utils = require("kube.utils")
 
 ---@type Formatter
 local M = {
-  headers = { "NAMESPACE", "NAME", "READY", "UP-TO-DATE", "AVAILABLE", "AGE" },
+  headers = { "NAMESPACE", "NAME", "READY", "DESIRED", "UP-TO-DATE", "AVAILABLE", "AGE" },
+  editable = { DESIRED = edits.replicas },
 
   format = function(data)
     local rows = {}
@@ -15,6 +17,7 @@ local M = {
           item.metadata.namespace,
           item.metadata.name,
           ready,
+          tostring(item.spec.replicas or 1),
           tostring(item.status.updatedReplicas or 0),
           tostring(item.status.availableReplicas or 0),
           utils.calculate_age(item.metadata.creationTimestamp),

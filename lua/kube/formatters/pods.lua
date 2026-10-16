@@ -17,7 +17,7 @@ local M = {
       local name = pod.metadata.name
       local namespace = pod.metadata.namespace
       local status = pod.status.phase
-      local highlight = "Kube" .. status
+      local highlights = { STATUS = "Kube" .. status }
 
       local ready_count = 0
       local container_count = #pod.spec.containers
@@ -31,14 +31,12 @@ local M = {
       local ready = string.format("%d/%d", ready_count, container_count)
 
       if status == "Running" and ready_count < container_count then
-        highlight = "KubePending"
-      elseif status == "Failed" then
-        highlight = "KubeFailed"
+        highlights.READY = "KubePending"
       end
       -- Like kubectl: a pod being deleted is shown as Terminating whatever its phase
       if pod.metadata.deletionTimestamp and pod.metadata.deletionTimestamp ~= vim.NIL then
         status = "Terminating"
-        highlight = "KubePending"
+        highlights.STATUS = "KubePending"
       end
 
       local restarts = 0
@@ -46,6 +44,9 @@ local M = {
         for _, container in ipairs(pod.status.containerStatuses) do
           restarts = restarts + container.restartCount
         end
+      end
+      if restarts > 0 then
+        highlights.RESTARTS = "KubePending"
       end
 
       local diagnostics = {}
@@ -87,8 +88,8 @@ local M = {
           pod.status.podIP or "",
           pod.spec.nodeName or "",
           utils.calculate_age(pod.metadata.creationTimestamp),
-          highlight = highlight,
         },
+        highlights = highlights,
         item = pod,
         diagnostics = diagnostics,
       })

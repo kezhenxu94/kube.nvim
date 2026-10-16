@@ -1,3 +1,4 @@
+local constants = require("kube.constants")
 local t = require("helpers")
 local utils = require("kube.utils")
 
@@ -578,5 +579,160 @@ describe("language server", function()
     local params = vim.lsp.util.make_position_params(0, "utf-16")
     local result = vim.lsp.buf_request_sync(0, "textDocument/definition", params, 2000)
     t.eq(PODS, result[next(result)].result.uri)
+  end)
+end)
+
+---@param ns integer
+---@return vim.api.keyset.get_extmark_item[]
+local function extmarks(ns)
+  return vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, { details = true })
+end
+
+---Put the cursor on the `column` cell of the row of `name` and press `keys`.
+---@param name string
+---@param column string
+---@param keys string
+local function edit_cell(name, column, keys)
+  local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+  for id, cell in pairs(kbuf.mark_columns) do
+    local item_name = cell.item and (cell.item.metadata and cell.item.metadata.name or cell.item.name)
+    if cell.column == column and item_name == name then
+      local mark = vim.api.nvim_buf_get_extmark_by_id(0, constants.KUBE_COLUMN_NAMESPACE, id, {})
+      vim.api.nvim_win_set_cursor(0, { mark[1] + 1, mark[2] })
+      vim.api.nvim_feedkeys(vim.keycode(keys), "mx", false)
+      return
+    end
+  end
+  error(string.format("no %s cell for %s", column, name))
+end
+
+describe("lists", function()
+  it("show deleted rows until they are written or restored", function()
+    open(PODS)
+    -- Like typing, so each delete can be undone
+    vim.cmd("let &undolevels = &undolevels")
+    t.press_on("web-1", "dd")
+    vim.api.nvim_exec_autocmds("TextChanged", { buffer = 0 })
+    local marks = extmarks(constants.KUBE_PENDING_NAMESPACE)
+    t.eq(1, #marks)
+    t.eq(0, marks[1][2])
+    t.ok(marks[1][4].virt_lines_above)
+    t.ok(marks[1][4].virt_lines[1][1][1]:match("^ns1%s+web%-1%s+2/2"), vim.inspect(marks[1][4].virt_lines))
+    t.eq("KubeDeleted", marks[1][4].virt_lines[1][1][2])
+    t.eq(1, vim.fn.winsaveview().topfill, "scrolled to show the line above the first one")
+
+    vim.cmd("let &undolevels = &undolevels")
+    t.press_on("web-2", "dd")
+    vim.api.nvim_exec_autocmds("TextChanged", { buffer = 0 })
+    marks = extmarks(constants.KUBE_PENDING_NAMESPACE)
+    t.eq(1, #marks, "below the last line")
+    t.eq(2, #marks[1][4].virt_lines)
+    t.ok(not marks[1][4].virt_lines_above)
+
+    vim.cmd("silent normal! uu")
+    vim.api.nvim_exec_autocmds("TextChanged", { buffer = 0 })
+    t.eq({}, extmarks(constants.KUBE_PENDING_NAMESPACE))
+  end)
+
+  it("highlight cells rather than rows", function()
+    open(PODS)
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    local highlighted = {}
+    for _, mark in ipairs(extmarks(constants.KUBE_COLUMN_NAMESPACE)) do
+      if mark[4].hl_group then
+        local cell = kbuf.mark_columns[mark[1]]
+        table.insert(highlighted, string.format("%s %s %s", cell.item.metadata.name, cell.column, mark[4].hl_group))
+      end
+    end
+    table.sort(highlighted)
+    t.eq({
+      "web-1 RESTARTS KubePending",
+      "web-1 STATUS KubeRunning",
+      "web-2 STATUS KubePending",
+    }, highlighted)
+  end)
+
+  it("flash the rows a watched reload changed", function()
+    open(PODS)
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+
+    -- Only the order changed
+    t.respond("*get pods -o json*", { fixture = "pods-reversed.json" })
+    kbuf:load({ silent = true })
+    t.wait_loaded()
+    t.eq({}, extmarks(constants.KUBE_CHANGED_NAMESPACE))
+
+    local data = vim.json.decode(t.fixture("pods.json"))
+    data.items[2].status.phase = "Failed"
+    t.respond("*get pods -o json*", { stdout = vim.json.encode(data) })
+    kbuf:load({ silent = true })
+    t.wait_loaded()
+    local marks = extmarks(constants.KUBE_CHANGED_NAMESPACE)
+    t.eq(1, #marks)
+    t.ok(t.lines()[marks[1][2] + 1]:match("web%-2"), t.lines()[marks[1][2] + 1])
+    t.wait_for(function()
+      return #extmarks(constants.KUBE_CHANGED_NAMESPACE) == 0
+    end, "the flash to end")
+
+    -- A reload asked for does not flash
+    data.items[2].status.phase = "Pending"
+    t.respond("*get pods -o json*", { stdout = vim.json.encode(data) })
+    kbuf:load()
+    t.wait_loaded()
+    t.eq({}, extmarks(constants.KUBE_CHANGED_NAMESPACE))
+  end)
+end)
+
+describe("editing cells", function()
+  it("scales after confirming the edited DESIRED", function()
+    t.respond("*scale*", { stdout = "deployment.apps/web scaled" })
+    local seen = prompts()
+    open("kube://namespaces/ns1/deployments")
+    edit_cell("web", "DESIRED", "ciw5<Esc>")
+    vim.cmd.write()
+    wait_call("scale")
+    t.eq({ "Apply the changes (context: ctx-a)?\n  Scale deployment.apps/web: 3 → 5" }, seen)
+    t.eq({ "--context ctx-a scale deployment.apps/web --replicas=5 -n ns1" }, t.calls_matching("scale"))
+    wait_call("get deployments", 2)
+  end)
+
+  it("applies edits and deletes together, :w! without confirming", function()
+    t.respond("*scale*", { stdout = "scaled" })
+    t.respond("*delete*", { stdout = "deleted" })
+    local data = vim.json.decode(t.fixture("deployments.json"))
+    local api = vim.deepcopy(data.items[1])
+    api.metadata.name = "api"
+    table.insert(data.items, api)
+    t.respond("*get deployments -o json*", { stdout = vim.json.encode(data) })
+    local seen = prompts()
+    open("kube://namespaces/ns1/deployments")
+    edit_cell("web", "DESIRED", "ciw0<Esc>")
+    t.press_on("api", "dd")
+    vim.cmd("write!")
+    wait_call("scale")
+    wait_call("delete")
+    t.eq({}, seen)
+    t.eq({ "--context ctx-a delete deployment.apps api -n ns1" }, t.calls_matching("delete"))
+  end)
+
+  it("rejects invalid values and keeps the edits", function()
+    local messages = t.capture_notify()
+    open("kube://namespaces/ns1/deployments")
+    edit_cell("web", "DESIRED", "ciw-1<Esc>")
+    vim.cmd.write()
+    t.eq("Invalid number of replicas for deployment.apps/web: -1", messages[#messages].msg)
+    t.eq(vim.log.levels.ERROR, messages[#messages].level)
+    t.eq({}, t.calls_matching("scale"))
+    t.ok(vim.bo.modified)
+  end)
+
+  it("sets the image of a container", function()
+    t.respond("*get pod -o json web-1 *", { fixture = "pod-web-1.json" })
+    t.respond("*set image*", { stdout = "pod/web-1 image updated" })
+    open("kube://namespaces/ns1/pod/web-1/containers")
+    edit_cell("app", "IMAGE", "cWweb:2<Esc>")
+    vim.cmd("write!")
+    wait_call("set image")
+    t.eq({ "--context ctx-a set image pod/web-1 app=web:2 -n ns1" }, t.calls_matching("set image"))
   end)
 end)

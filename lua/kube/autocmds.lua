@@ -80,6 +80,17 @@ function M.setup()
     end,
   })
 
+  autocmd({ "TextChanged", "TextChangedI" }, {
+    group = "kube_autocmds",
+    pattern = "kube://*",
+    callback = function(ev)
+      local buffer = _G.kube_buffers[ev.buf]
+      if buffer and not vim.tbl_isempty(buffer.mark_mappings) then
+        require("kube.renderers.resources").show_pending(buffer)
+      end
+    end,
+  })
+
   autocmd("BufWinEnter", {
     group = "kube_autocmds",
     pattern = "kube://*",

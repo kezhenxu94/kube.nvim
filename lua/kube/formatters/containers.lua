@@ -1,6 +1,7 @@
 ---@type Formatter
 local M = {
   headers = { "NAME", "STATUS", "IMAGE", "PORTS" },
+  editable = { IMAGE = require("kube.edits").image },
 
   format = function(parent_resource)
     local container_statuses = {}
@@ -71,8 +72,8 @@ local M = {
           status,
           container.image,
           ports,
-          highlight = "Kube" .. status,
         },
+        highlights = { STATUS = "Kube" .. status },
         item = container,
       })
     end

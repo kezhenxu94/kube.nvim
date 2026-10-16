@@ -1,0 +1,31 @@
+name: Help tags
+
+on:
+  push:
+    branches: [main]
+    paths: [doc/**]
+
+permissions:
+  contents: write
+
+jobs:
+  helptags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+      # Fails on duplicate tags
+      - run: nvim --headless --clean -c "try | helptags doc | catch | cquit | endtry" -c "qa!"
+      - name: Commit doc/tags
+        run: |
+          git add doc/tags
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: generate help tags"
+          git push

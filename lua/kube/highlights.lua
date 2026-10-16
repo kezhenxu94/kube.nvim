@@ -6,6 +6,8 @@
 ---@field KubeSucceeded table<string, any>
 ---@field KubeUnknown table<string, any>
 ---@field KubeHeader table<string, any>
+---@field KubeDeleted table<string, any>
+---@field KubeChanged table<string, any>
 
 local M = {}
 
@@ -19,6 +21,10 @@ local default_highlights = {
   KubeSucceeded = { link = "Comment" },
   KubeUnknown = { link = "Comment" },
   KubeHeader = { link = "Title" },
+  -- Rows deleted from a list, until `:w` deletes the resources
+  KubeDeleted = { link = "DiffDelete" },
+  -- Rows a watched reload changed
+  KubeChanged = { link = "DiffChange" },
 }
 
 ---@type Highlights

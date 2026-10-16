@@ -18,9 +18,9 @@ describe("pods formatter", function()
   it("formats ready, restarts and status", function()
     local result = rows("pods", "pods.json")
     t.eq({ "ns1", "web-1", "2/2", "Running", "3", "10.0.0.1", "node-1" }, vim.list_slice(result[1].row, 1, 7))
-    t.eq("KubeRunning", result[1].row.highlight)
+    t.eq({ STATUS = "KubeRunning", RESTARTS = "KubePending" }, result[1].highlights)
     t.eq({ "ns1", "web-2", "0/1", "Pending", "0", "", "" }, vim.list_slice(result[2].row, 1, 7))
-    t.eq("KubePending", result[2].row.highlight)
+    t.eq({ STATUS = "KubePending" }, result[2].highlights)
   end)
 
   it("reports diagnostics for pods that are not ready", function()
@@ -37,22 +37,25 @@ describe("pods formatter", function()
     data.items[1].status.conditions = { { type = "Ready", status = "False", reason = "PodCompleted" } }
     local row = formatters.pods.format(data)[1]
     t.eq("Terminating", row.row[4])
-    t.eq("KubePending", row.row.highlight)
+    t.eq("KubePending", row.highlights.STATUS)
     t.eq(vim.diagnostic.severity.INFO, row.diagnostics[1].severity)
   end)
 
-  it("marks running pods with unready containers as pending", function()
+  it("marks the readiness of running pods with unready containers as pending", function()
     local data = vim.json.decode(t.fixture("pods.json"))
     data.items[1].status.containerStatuses[1].ready = false
-    t.eq("KubePending", formatters.pods.format(data)[1].row.highlight)
+    local highlights = formatters.pods.format(data)[1].highlights
+    t.eq("KubeRunning", highlights.STATUS)
+    t.eq("KubePending", highlights.READY)
   end)
 end)
 
 describe("containers formatter", function()
   it("lists containers with status and ports", function()
     local result = rows("containers", "pod-web-1.json")
-    t.eq({ "app", "Running", "web:1", "8080/TCP, 9090/TCP", highlight = "KubeRunning" }, result[1].row)
-    t.eq({ "sidecar", "Running", "proxy:1", "", highlight = "KubeRunning" }, result[2].row)
+    t.eq({ "app", "Running", "web:1", "8080/TCP, 9090/TCP" }, result[1].row)
+    t.eq({ "sidecar", "Running", "proxy:1", "" }, result[2].row)
+    t.eq({ STATUS = "KubeRunning" }, result[1].highlights)
     t.eq("app", result[1].item.name)
   end)
 
@@ -62,8 +65,8 @@ describe("containers formatter", function()
 end)
 
 describe("deployments formatter", function()
-  it("formats replica counts", function()
-    t.eq({ "ns1", "web", "1/2", "2", "1" }, vim.list_slice(rows("deployments", "deployments.json")[1].row, 1, 5))
+  it("formats replica counts, DESIRED from the spec", function()
+    t.eq({ "ns1", "web", "1/2", "3", "2", "1" }, vim.list_slice(rows("deployments", "deployments.json")[1].row, 1, 6))
   end)
 end)
 

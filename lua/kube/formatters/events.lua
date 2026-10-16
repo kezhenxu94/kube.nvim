@@ -37,8 +37,8 @@ local M = {
           event.reason or "",
           string.format("%s/%s", (object.kind or ""):lower(), object.name or ""),
           message,
-          highlight = warning and "KubePending" or "KubeBody",
         },
+        highlights = warning and { TYPE = "KubePending" } or nil,
         item = event,
         diagnostics = warning and { { message = message, severity = vim.diagnostic.severity.WARN } } or nil,
       })

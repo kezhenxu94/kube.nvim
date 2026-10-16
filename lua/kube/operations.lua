@@ -261,8 +261,8 @@ local function bulk_operations(kbuf, resources)
       run = function()
         local current = resources[1].spec and resources[1].spec.replicas or 1
         vim.ui.input({ prompt = "Replicas: ", default = tostring(current) }, function(input)
-          local replicas = tonumber(input)
-          if not replicas or replicas < 0 or replicas % 1 ~= 0 then
+          local replicas = require("kube.edits").parse_replicas(input)
+          if not replicas then
             if input then
               vim.notify("Invalid number of replicas: " .. input, vim.log.levels.ERROR)
             end

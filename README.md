@@ -36,7 +36,7 @@ A buffer opened without `context/{context}/` is bound to the context that was cu
 
 ## Features
 
-* **Edit the cluster like a buffer**: delete lines and `:w` to delete resources; edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
+* **Edit the cluster like a buffer**: delete lines and `:w` to delete resources (deleted lines stay visible until written); edit DESIRED (deployments, statefulsets, replicasets), IMAGE (containers) or SUSPENDED (cron jobs) cells and `:w` to scale, set the image or suspend; edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
 * **LSP**: kube buffers have an in-process language server, so LSP keymaps and pickers work: `K` describes, `gd` / `<C-]>` jump to what the cell refers to, `gO` lists the resources, and `gra` offers every operation, on a visual selection for all selected resources.
 * **Operations**: scale, rollout restart / undo / history, cordon / uncordon / drain, set image, delete, with confirmations naming the context.
 * **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default.
@@ -102,7 +102,8 @@ require("kube").setup({
   logs = { tail = 1000 }, -- -1 for all
   -- Highlight overrides, by default linked to your colorscheme's groups:
   -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (Normal),
-  -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title)
+  -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title),
+  -- KubeDeleted (DiffDelete): deleted lines, KubeChanged (DiffChange): lines a watched reload changed
   -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
   highlights = {},
 })
