@@ -9,15 +9,16 @@
 
 local M = {}
 
+---Linked with `default`, so colorschemes and `:highlight` take precedence.
 ---@type Highlights
 local default_highlights = {
-  KubeBody = { fg = "#40a02b" },
-  KubePending = { fg = "#fe640b" },
-  KubeRunning = { fg = "#40a02b" },
-  KubeFailed = { fg = "#d20f39" },
-  KubeSucceeded = { fg = "#9ca0b0" },
-  KubeUnknown = { fg = "#6c6f85" },
-  KubeHeader = { fg = "#df8e1d", bold = true },
+  KubeBody = { link = "Normal" },
+  KubePending = { link = "DiagnosticWarn" },
+  KubeRunning = { link = "DiagnosticOk" },
+  KubeFailed = { link = "DiagnosticError" },
+  KubeSucceeded = { link = "Comment" },
+  KubeUnknown = { link = "Comment" },
+  KubeHeader = { link = "Title" },
 }
 
 ---@type Highlights
@@ -28,10 +29,12 @@ function M.setup(opts)
   if opts and opts.highlights then
     user_highlights = opts.highlights
   end
-  local highlights = vim.tbl_deep_extend("force", default_highlights, user_highlights)
 
-  for group, colors in pairs(highlights) do
-    vim.api.nvim_set_hl(0, group, colors)
+  for group, hl in pairs(default_highlights) do
+    vim.api.nvim_set_hl(0, group, vim.tbl_extend("force", hl, { default = true }))
+  end
+  for group, hl in pairs(user_highlights) do
+    vim.api.nvim_set_hl(0, group, hl)
   end
 end
 

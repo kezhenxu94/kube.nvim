@@ -100,15 +100,11 @@ require("kube").setup({
   -- kubectl --request-timeout, for everything except streams (logs -f, port-forward, exec, drain)
   request_timeout = "30s",
   logs = { tail = 1000 }, -- -1 for all
-  highlights = {
-    KubeBody = { fg = "#40a02b" },
-    KubePending = { fg = "#fe640b" },
-    KubeRunning = { fg = "#40a02b" },
-    KubeFailed = { fg = "#d20f39" },
-    KubeSucceeded = { fg = "#9ca0b0" },
-    KubeUnknown = { fg = "#6c6f85" },
-    KubeHeader = { fg = "#df8e1d", bold = true },
-  },
+  -- Highlight overrides, by default linked to your colorscheme's groups:
+  -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (DiagnosticOk),
+  -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title)
+  -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
+  highlights = {},
 })
 ```
 
