@@ -1,0 +1,17 @@
+:Kube	kube.txt	/*:Kube*
+:Kube-apply	kube.txt	/*:Kube-apply*
+:Kube-diff	kube.txt	/*:Kube-diff*
+:Kube-portforwards	kube.txt	/*:Kube-portforwards*
+kube	kube.txt	/*kube*
+kube-buffers	kube.txt	/*kube-buffers*
+kube-commands	kube.txt	/*kube-commands*
+kube-config	kube.txt	/*kube-config*
+kube-contents	kube.txt	/*kube-contents*
+kube-editing	kube.txt	/*kube-editing*
+kube-health	kube.txt	/*kube-health*
+kube-jump	kube.txt	/*kube-jump*
+kube-keymaps	kube.txt	/*kube-keymaps*
+kube-lsp	kube.txt	/*kube-lsp*
+kube-secrets	kube.txt	/*kube-secrets*
+kube.nvim	kube.txt	/*kube.nvim*
+kube.txt	kube.txt	/*kube.txt*
