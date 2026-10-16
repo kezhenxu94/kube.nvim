@@ -531,6 +531,34 @@ describe("language server", function()
     )
   end)
 
+  it("reports hover progress while kubectl describes", function()
+    local reported = {}
+    local id = vim.api.nvim_create_autocmd("LspProgress", {
+      callback = function(ev)
+        local value = ev.data.params.value
+        table.insert(reported, { kind = value.kind, title = value.title, message = value.message })
+      end,
+    })
+    t.respond("*describe*", { script = "sleep 0.3; echo 'Name: web-1'" })
+    open("kube://namespaces/ns1/pods")
+    wait_lsp()
+    t.press_on("web-1", "K")
+    t.wait_for(function()
+      return #reported == 2
+    end, "progress begin and end")
+    t.eq({ kind = "begin", title = "Describing pod/web-1" }, reported[1])
+    t.eq({ "end", nil }, { reported[2].kind, reported[2].message })
+
+    reported = {}
+    t.respond("*describe*", { stderr = "forbidden", code = 1 })
+    t.press_on("web-2", "K")
+    t.wait_for(function()
+      return #reported == 2
+    end, "progress begin and end")
+    t.eq({ "end", "Failed" }, { reported[2].kind, reported[2].message })
+    vim.api.nvim_del_autocmd(id)
+  end)
+
   it("lists the resources as document symbols", function()
     open("kube://namespaces/ns1/pods")
     wait_lsp()

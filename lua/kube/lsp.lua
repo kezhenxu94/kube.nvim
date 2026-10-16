@@ -28,7 +28,26 @@ local function line_range(line)
   return { start = { line = line, character = 0 }, ["end"] = { line = line, character = 0 } }
 end
 
----@type table<string, fun(params: table, reply: fun(err: lsp.ResponseError|nil, result: any))>
+local progress_count = 0
+
+---Report work done progress (`$/progress`) to the client, created by the server.
+---@param dispatchers vim.lsp.rpc.Dispatchers
+---@param title string
+---@return fun(message: string|nil) done Ends the progress
+local function progress(dispatchers, title)
+  progress_count = progress_count + 1
+  local token = "kube.nvim/" .. progress_count
+  local _, err = dispatchers.server_request("window/workDoneProgress/create", { token = token })
+  if err then
+    return function() end
+  end
+  dispatchers.notification("$/progress", { token = token, value = { kind = "begin", title = title } })
+  return function(message)
+    dispatchers.notification("$/progress", { token = token, value = { kind = "end", message = message } })
+  end
+end
+
+---@type table<string, fun(params: table, reply: fun(err: lsp.ResponseError|nil, result: any), dispatchers: vim.lsp.rpc.Dispatchers)>
 local handlers = {
   initialize = function(_, reply)
     reply(nil, {
@@ -49,7 +68,7 @@ local handlers = {
     reply(nil, nil)
   end,
 
-  ["textDocument/hover"] = function(params, reply)
+  ["textDocument/hover"] = function(params, reply, dispatchers)
     local kbuf = kube_buffer(params.textDocument.uri)
     local line = params.position.line
     local resource = kbuf and operations.items_in_rows(kbuf, line, line)[1]
@@ -57,18 +76,15 @@ local handlers = {
       reply(nil, nil)
       return
     end
-    kubectl.describe(
-      kbuf.context,
-      utils.resource_type(resource),
-      resource.metadata.name,
-      resource.metadata.namespace,
-      function(result)
-        reply(nil, result and { contents = { kind = "plaintext", value = vim.trim(result) } } or nil)
-      end,
-      function(err)
-        vim.notify(err, vim.log.levels.ERROR)
-      end
-    )
+    local resource_type = utils.resource_type(resource)
+    -- The hover is only shown once kubectl answers: report the progress meanwhile
+    local done = progress(dispatchers, string.format("Describing %s/%s", resource_type, resource.metadata.name))
+    kubectl.describe(kbuf.context, resource_type, resource.metadata.name, resource.metadata.namespace, function(result)
+      done(not result and "Failed" or nil)
+      reply(nil, result and { contents = { kind = "plaintext", value = vim.trim(result) } } or nil)
+    end, function(err)
+      vim.notify(err, vim.log.levels.ERROR)
+    end)
   end,
 
   ["textDocument/definition"] = function(params, reply)
@@ -156,7 +172,7 @@ function M.server(dispatchers)
       end
       local handler = handlers[method]
       if handler then
-        handler(params, reply)
+        handler(params, reply, dispatchers)
       else
         reply({ code = vim.lsp.protocol.ErrorCodes.MethodNotFound, message = "Not supported: " .. method }, nil)
       end
