@@ -1,0 +1,38 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "web",
+    "namespace": "ns1",
+    "creationTimestamp": "2026-01-01T00:00:00Z"
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "tier": "frontend",
+        "app": "web"
+      }
+    },
+    "template": {
+      "spec": {
+        "containers": [
+          {
+            "name": "app",
+            "image": "web:1",
+            "ports": [
+              {
+                "containerPort": 8080
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "status": {
+    "replicas": 2,
+    "readyReplicas": 1,
+    "updatedReplicas": 2,
+    "availableReplicas": 1
+  }
+}

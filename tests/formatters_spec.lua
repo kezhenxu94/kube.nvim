@@ -31,6 +31,16 @@ describe("pods formatter", function()
     }, result[2].diagnostics)
   end)
 
+  it("shows pods being deleted as terminating, like kubectl", function()
+    local data = vim.json.decode(t.fixture("pods.json"))
+    data.items[1].metadata.deletionTimestamp = "2026-01-01T00:00:00Z"
+    data.items[1].status.conditions = { { type = "Ready", status = "False", reason = "PodCompleted" } }
+    local row = formatters.pods.format(data)[1]
+    t.eq("Terminating", row.row[4])
+    t.eq("KubePending", row.row.highlight)
+    t.eq(vim.diagnostic.severity.INFO, row.diagnostics[1].severity)
+  end)
+
   it("marks running pods with unready containers as pending", function()
     local data = vim.json.decode(t.fixture("pods.json"))
     data.items[1].status.containerStatuses[1].ready = false

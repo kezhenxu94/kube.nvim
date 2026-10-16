@@ -297,6 +297,45 @@ describe("events", function()
     t.eq(0, diagnostics[1].lnum)
   end)
 
+  it("of a workload include the pods it selects", function()
+    t.respond("*get deployment.apps -o json web *", { fixture = "deployment-web.json" })
+    t.respond("*get pods,replicasets -o json*", { fixture = "pods.json" })
+    open("kube://namespaces/ns1/deployments")
+    t.press_on("web", "")
+    code_action("Show events")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/events?for=deployment.apps/web")
+    t.wait_for(function()
+      return #t.lines() == 2
+    end, "events of the deployment and its pods")
+    t.ok(t.lines()[1]:find("deployment/web", 1, true), t.lines()[1])
+    t.ok(t.lines()[2]:find("pod/web-1", 1, true), t.lines()[2])
+    t.eq(
+      { "--context ctx-a get pods,replicasets -o json -n ns1 --selector=app=web,tier=frontend" },
+      t.calls_matching("pods,replicasets")
+    )
+  end)
+
+  it("of a resource without a selector are its own", function()
+    t.respond("*get configmap -o json cfg *", {
+      stdout = vim.json.encode({
+        apiVersion = "v1",
+        kind = "ConfigMap",
+        metadata = { name = "cfg", namespace = "ns1" },
+      }),
+    })
+    open("kube://context/ctx-a/namespaces/ns1/events?for=configmap/cfg")
+    t.wait_for(function()
+      return t.status() == "No events: Kubernetes keeps events for 1 hour by default"
+    end, "the empty status")
+    t.eq({}, t.calls_matching("pods,replicasets"))
+  end)
+
+  it("explain why there are none", function()
+    t.respond("*get events -o json*", { stdout = '{"items":[]}' })
+    open("kube://namespaces/ns1/events")
+    t.eq("No events: Kubernetes keeps events for 1 hour by default", t.status())
+  end)
+
   it("<C-]> on the object goes to it", function()
     open("kube://namespaces/ns1/events")
     t.press_on("deployment/web", "<C-]>")

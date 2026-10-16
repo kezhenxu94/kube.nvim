@@ -13,6 +13,8 @@ local M = {}
 local LOGS = { Pod = true, Deployment = true, StatefulSet = true, DaemonSet = true, ReplicaSet = true, Job = true }
 local SCALABLE = { Deployment = true, StatefulSet = true, ReplicaSet = true }
 local ROLLOUT = { Deployment = true, StatefulSet = true, DaemonSet = true }
+local RELATED_EVENTS =
+  { Deployment = true, StatefulSet = true, DaemonSet = true, ReplicaSet = true, Job = true, Service = true }
 
 ---@param resources table[]
 ---@return string
@@ -152,17 +154,21 @@ local function single_operations(kbuf, resource)
     {
       title = "Show events",
       run = function()
-        utils.open({
-          context = kbuf.context,
-          namespace = resource.metadata.namespace,
-          kind = "events",
-          params = {
+        -- Workloads and services: also the events of the pods they select, see renderers.related_events
+        local params = RELATED_EVENTS[kind]
+            and { ["for"] = utils.resource_type(resource) .. "/" .. resource.metadata.name }
+          or {
             ["field-selector"] = string.format(
               "involvedObject.kind=%s,involvedObject.name=%s",
               kind,
               resource.metadata.name
             ),
-          },
+          }
+        utils.open({
+          context = kbuf.context,
+          namespace = resource.metadata.namespace,
+          kind = "events",
+          params = params,
         })
       end,
     },

@@ -194,6 +194,14 @@ describe("kind cluster", function()
     wait_line("^kube%-e2e%s+")
   end)
 
+  it("shows the events of a deployment and its pods", function()
+    open(list("deployments"))
+    t.press_on("web", "")
+    code_action("Show events")
+    -- The restart above created pods, whose events belong to the deployment's
+    wait_line("Scheduled%s+pod/web%-")
+  end)
+
   it("forwards ports", function()
     open(list("services"))
     local asked = false
@@ -218,7 +226,9 @@ describe("kind cluster", function()
 
   it("execs into a container", function()
     open(list("pods"))
-    t.press_on("web-", "gs")
+    -- Not a pod still terminating after the restart
+    local pod = wait_line("^kube%-e2e%s+web%-%S+%s+1/1%s+Running"):match("^kube%-e2e%s+(%S+)")
+    t.press_on(pod, "gs")
     local channel = vim.bo.channel
     t.ok(channel > 0, "terminal job")
     vim.fn.chansend(channel, "echo e2e-$((40+2))\n")

@@ -4,6 +4,7 @@ local finished_statuses = { "Completed", "Succeeded" }
 local severity_map = {
   Pending = vim.diagnostic.severity.WARN,
   Failed = vim.diagnostic.severity.ERROR,
+  Terminating = vim.diagnostic.severity.INFO,
 }
 
 ---@type Formatter
@@ -33,6 +34,11 @@ local M = {
         highlight = "KubePending"
       elseif status == "Failed" then
         highlight = "KubeFailed"
+      end
+      -- Like kubectl: a pod being deleted is shown as Terminating whatever its phase
+      if pod.metadata.deletionTimestamp and pod.metadata.deletionTimestamp ~= vim.NIL then
+        status = "Terminating"
+        highlight = "KubePending"
       end
 
       local restarts = 0

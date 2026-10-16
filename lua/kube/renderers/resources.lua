@@ -131,7 +131,7 @@ function M.render(buffer, formatter, data)
   self:set_lines(lines, true)
   restore_cursors(cursors, formatted_rows)
   if #lines == 0 then
-    self:set_status("No resources found", "Comment")
+    self:set_status(formatter.empty or "No resources found", "Comment")
   end
 
   local diagnostics = {}

@@ -12,6 +12,8 @@ end
 ---@type Formatter
 local M = {
   headers = { "NAMESPACE", "LAST SEEN", "TYPE", "REASON", "OBJECT", "MESSAGE" },
+  -- Events of an object are only kept for a while (--event-ttl, 1h by default)
+  empty = "No events: Kubernetes keeps events for 1 hour by default",
 
   format = function(data)
     local events = vim.list_extend({}, data.items)

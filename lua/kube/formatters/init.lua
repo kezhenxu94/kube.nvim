@@ -2,6 +2,7 @@
 ---@field headers string[] List of column headers
 ---@field format fun(data: table, buffer: KubeBuffer): FormattedRow[] Function that takes raw data and returns formatted rows
 ---@field subresource_formatters table<string, Formatter[]>|nil Map of subresource name to formatter
+---@field empty string|nil Status shown when there are no rows
 ---@class FormattedRow
 ---@field row table The row data containing column values
 ---@field item table The original resource item data

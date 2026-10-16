@@ -3,17 +3,62 @@
   "kind": "List",
   "items": [
     {
-      "apiVersion": "v1", "kind": "Event",
-      "metadata": { "name": "e1", "namespace": "ns1", "creationTimestamp": "2026-01-01T00:00:00Z" },
-      "involvedObject": { "apiVersion": "v1", "kind": "Pod", "name": "web-1", "namespace": "ns1" },
-      "type": "Normal", "reason": "Pulled", "message": "Successfully pulled image", "lastTimestamp": "2026-01-01T00:00:00Z"
+      "apiVersion": "v1",
+      "kind": "Event",
+      "metadata": {
+        "name": "e1",
+        "namespace": "ns1",
+        "creationTimestamp": "2026-01-01T00:00:00Z"
+      },
+      "involvedObject": {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "name": "web-1",
+        "namespace": "ns1"
+      },
+      "type": "Normal",
+      "reason": "Pulled",
+      "message": "Successfully pulled image",
+      "lastTimestamp": "2026-01-01T00:00:00Z"
     },
     {
-      "apiVersion": "v1", "kind": "Event",
-      "metadata": { "name": "e2", "namespace": "ns1", "creationTimestamp": "2026-01-02T00:00:00Z" },
-      "involvedObject": { "apiVersion": "apps/v1", "kind": "Deployment", "name": "web", "namespace": "ns1" },
-      "type": "Warning", "reason": "BackOff", "message": "Back-off restarting\nfailed container", "lastTimestamp": null,
+      "apiVersion": "v1",
+      "kind": "Event",
+      "metadata": {
+        "name": "e2",
+        "namespace": "ns1",
+        "creationTimestamp": "2026-01-02T00:00:00Z"
+      },
+      "involvedObject": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "namespace": "ns1"
+      },
+      "type": "Warning",
+      "reason": "BackOff",
+      "message": "Back-off restarting\nfailed container",
+      "lastTimestamp": null,
       "eventTime": "2026-01-02T00:00:00.123456Z"
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Event",
+      "metadata": {
+        "name": "e0",
+        "namespace": "ns1",
+        "creationTimestamp": "2025-12-31T00:00:00Z"
+      },
+      "involvedObject": {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "name": "other-1",
+        "namespace": "ns1"
+      },
+      "type": "Normal",
+      "reason": "Started",
+      "message": "Started container",
+      "lastTimestamp": "2025-12-31T00:00:00Z"
     }
   ]
 }
