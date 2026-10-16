@@ -149,10 +149,11 @@ deleted lines stay visible, as virtual lines, until written or undone. Deleted
 lines and edited cells are confirmed together.
 
 Edit cells and |:w| to apply them, after confirming all changes; |:w!|
-without confirming:
+without confirming. Editable cells are highlighted with `KubeEditable`:
     DESIRED     deployments, statefulsets, replicasets: scale
     IMAGE       containers of a pod: set the image
     SUSPENDED   cron jobs: `true` or `false`
+|:w| refuses edits of the other cells and keeps them, to fix or undo.
 
 Watched lists (`gw`) highlight the lines a reload changed for a moment.
 
@@ -188,7 +189,8 @@ Defaults: >lua
       -- KubeBody (Normal), KubePending (DiagnosticWarn),
       -- KubeRunning (Normal), KubeFailed (DiagnosticError),
       -- KubeSucceeded, KubeUnknown (Comment), KubeHeader (Title),
-      -- KubeDeleted (DiffDelete), KubeChanged (DiffChange)
+      -- KubeDeleted (DiffDelete), KubeChanged (DiffChange),
+      -- KubeEditable (Identifier)
       -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
       highlights = {},
     })

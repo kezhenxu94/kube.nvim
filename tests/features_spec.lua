@@ -723,6 +723,19 @@ describe("lists", function()
     }, highlighted)
   end)
 
+  it("highlight the cells of editable columns", function()
+    open("kube://namespaces/ns1/deployments")
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    local editable = {}
+    for _, mark in ipairs(extmarks(constants.KUBE_COLUMN_NAMESPACE)) do
+      if mark[4].hl_group == "KubeEditable" then
+        table.insert(editable, kbuf.mark_columns[mark[1]].column)
+      end
+    end
+    t.ok(#editable > 0)
+    t.eq({ "DESIRED" }, vim.fn.uniq(vim.fn.sort(editable)))
+  end)
+
   it("flash the rows a watched reload changed", function()
     open(PODS)
     local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
@@ -794,6 +807,16 @@ describe("editing cells", function()
     t.eq("Invalid number of replicas for deployment.apps/web: -1", messages[#messages].msg)
     t.eq(vim.log.levels.ERROR, messages[#messages].level)
     t.eq({}, t.calls_matching("scale"))
+    t.ok(vim.bo.modified)
+  end)
+
+  it("rejects edits of other columns and keeps the edits", function()
+    local messages = t.capture_notify()
+    open("kube://namespaces/ns1/pods")
+    edit_cell("web-1", "NAMESPACE", "ciwns2<Esc>")
+    vim.cmd.write()
+    t.eq("NAMESPACE of pod/web-1 is not editable", messages[#messages].msg)
+    t.eq(vim.log.levels.ERROR, messages[#messages].level)
     t.ok(vim.bo.modified)
   end)
 

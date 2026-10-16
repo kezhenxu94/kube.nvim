@@ -16,30 +16,32 @@ local function deleted(buffer, row_mark)
   return #mark == 3 and mark[3] and mark[3].invalid == true
 end
 
----The edits of the cells of editable columns, and the errors of the invalid ones.
+---The edits of the cells of editable columns, and the errors of the invalid ones and of the other edited cells.
 ---@param buffer KubeBuffer
 ---@return KubeEdit[] edits
 ---@return string[] errors
 local function cell_edits(buffer)
   local edits, errors = {}, {}
-  local editable = require("kube.renderers.resources").formatter_for(buffer).editable
-  if not editable then
-    return edits, errors
-  end
+  local editable = require("kube.renderers.resources").formatter_for(buffer).editable or {}
 
   -- Marks are created in the order of the cells
   local ids = vim.tbl_keys(buffer.mark_columns)
   table.sort(ids)
   for _, id in ipairs(ids) do
     local cell = buffer.mark_columns[id]
-    local editor = editable[cell.column]
-    if editor and cell.item and cell.row_mark and not deleted(buffer, cell.row_mark) then
+    if cell.item and cell.row_mark and not deleted(buffer, cell.row_mark) then
       local mark =
         vim.api.nvim_buf_get_extmark_by_id(buffer.buf_nr, constants.KUBE_COLUMN_NAMESPACE, id, { details = true })
       local text = vim.trim(
         table.concat(vim.api.nvim_buf_get_text(buffer.buf_nr, mark[1], mark[2], mark[3].end_row, mark[3].end_col, {}))
       )
-      if text ~= cell.text then
+      local editor = editable[cell.column]
+      if text ~= cell.text and not editor then
+        local item = cell.item.metadata
+            and string.format("%s/%s", utils.resource_type(cell.item), cell.item.metadata.name)
+          or cell.item.name
+        table.insert(errors, string.format("%s of %s is not editable", cell.column, item))
+      elseif text ~= cell.text then
         local edit, err = editor(buffer, cell.item, cell.text, text)
         if edit then
           table.insert(edits, edit)

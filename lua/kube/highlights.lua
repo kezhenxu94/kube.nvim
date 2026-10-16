@@ -8,6 +8,7 @@
 ---@field KubeHeader table<string, any>
 ---@field KubeDeleted table<string, any>
 ---@field KubeChanged table<string, any>
+---@field KubeEditable table<string, any>
 
 local M = {}
 
@@ -25,6 +26,8 @@ local default_highlights = {
   KubeDeleted = { link = "DiffDelete" },
   -- Rows a watched reload changed
   KubeChanged = { link = "DiffChange" },
+  -- Cells of the columns `:w` applies, e.g. DESIRED
+  KubeEditable = { link = "Identifier" },
 }
 
 ---@type Highlights

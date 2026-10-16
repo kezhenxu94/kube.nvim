@@ -331,7 +331,9 @@ function M.render(buffer, formatter, data, metrics)
           end_col = range[2],
           right_gravity = false,
           end_right_gravity = true,
-          hl_group = row.highlights and row.highlights[headers[i]],
+          hl_group = row.highlights and row.highlights[headers[i]]
+            or formatter.editable and formatter.editable[headers[i]] and "KubeEditable"
+            or nil,
         })
       self.mark_columns[mark_id] = {
         item = row.raw,

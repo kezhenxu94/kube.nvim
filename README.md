@@ -36,7 +36,7 @@ A buffer opened without `context/{context}/` is bound to the context that was cu
 
 ## Features
 
-* **Edit the cluster like a buffer**: delete lines and `:w` to delete resources (deleted lines stay visible until written); edit DESIRED (deployments, statefulsets, replicasets), IMAGE (containers) or SUSPENDED (cron jobs) cells and `:w` to scale, set the image or suspend; edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
+* **Edit the cluster like a buffer**: delete lines and `:w` to delete resources (deleted lines stay visible until written); edit DESIRED (deployments, statefulsets, replicasets), IMAGE (containers) or SUSPENDED (cron jobs) cells and `:w` to scale, set the image or suspend (`:w` refuses edits of other cells); edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
 * **LSP**: kube buffers have an in-process language server, so LSP keymaps and pickers work: `K` describes, `gd` / `<C-]>` jump to what the cell refers to, `gO` lists the resources, and `gra` offers every operation, on a visual selection for all selected resources.
 * **Operations**: scale, rollout restart / undo / history, cordon / uncordon / drain, set image, trigger a cron job now, delete, with confirmations naming the context.
 * **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default. Following keeps the cursor at the end, like `tail -f`.
@@ -108,7 +108,8 @@ require("kube").setup({
   -- Highlight overrides, by default linked to your colorscheme's groups:
   -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (Normal),
   -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title),
-  -- KubeDeleted (DiffDelete): deleted lines, KubeChanged (DiffChange): lines a watched reload changed
+  -- KubeDeleted (DiffDelete): deleted lines, KubeChanged (DiffChange): lines a watched reload changed,
+  -- KubeEditable (Identifier): cells of editable columns
   -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
   highlights = {},
 })
