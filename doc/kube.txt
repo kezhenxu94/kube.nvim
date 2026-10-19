@@ -87,6 +87,9 @@ Lists of pods and nodes have CPU and MEMORY columns (`kubectl top`) when the
 cluster has the metrics API, e.g. with metrics-server. Statuses are shown as
 kubectl does: `CrashLoopBackOff`, `Init:0/1`, `NotReady,SchedulingDisabled`, ...
 Followed logs keep the cursor at the end when it is on the last line.
+Logs can be edited to make them readable, e.g. `:%!jq` or `:%!jq .message -r`
+for JSON logs. There is nothing to write back: |:w| fails and keeps the edits,
+`:w {file}` saves them, |:e| reloads.
 
 ==============================================================================
 4. Keymaps                                                      *kube-keymaps*

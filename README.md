@@ -39,7 +39,7 @@ A buffer opened without `context/{context}/` is bound to the context that was cu
 * **Edit the cluster like a buffer**: delete lines and `:w` to delete resources (deleted lines stay visible until written); edit DESIRED (deployments, statefulsets, replicasets), IMAGE (containers) or SUSPENDED (cron jobs) cells and `:w` to scale, set the image or suspend (`:w` refuses edits of other cells); edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
 * **LSP**: kube buffers have an in-process language server, so LSP keymaps and pickers work: `K` describes, `gd` / `<C-]>` jump to what the cell refers to, `gO` lists the resources, and `gra` offers every operation, on a visual selection for all selected resources.
 * **Operations**: scale, rollout restart / undo / history, cordon / uncordon / drain, set image, trigger a cron job now, delete, with confirmations naming the context.
-* **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default. Following keeps the cursor at the end, like `tail -f`.
+* **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default. Following keeps the cursor at the end, like `tail -f`. Logs can be edited, e.g. `:%!jq`, `:%!jq .message -r` or `:%s/\\t/\t/g` to make them readable, `:w {file}` saves them.
 * **Events**: per namespace or for the resource under the cursor, warnings as diagnostics.
 * **Secrets**: view and edit decoded secret data.
 * **Port forwarding**: forward ports of pods, deployments and services, `gx` opens them.

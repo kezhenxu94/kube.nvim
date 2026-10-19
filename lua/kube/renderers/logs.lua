@@ -48,7 +48,7 @@ local M = {
 
       local lines = vim.split(result, "\n")
       if not follow then
-        self:set_lines(lines)
+        self:set_lines(lines, true)
         return
       end
 
@@ -68,8 +68,6 @@ local M = {
         vim.api.nvim_buf_set_lines(self.buf_nr, 0, excess, false, {})
       end
       set_status("Waiting for new logs... (Ctrl+C to stop)")
-      vim.bo[self.buf_nr].modifiable = false
-      vim.bo[self.buf_nr].modified = false
       for _, win in ipairs(at_end) do
         vim.api.nvim_win_set_cursor(win, { vim.api.nvim_buf_line_count(self.buf_nr), 0 })
       end

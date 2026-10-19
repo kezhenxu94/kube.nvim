@@ -111,7 +111,10 @@ function KubeBuffer:new(buf_nr)
 end
 
 function KubeBuffer:setup()
-  vim.api.nvim_set_option_value("buftype", "acwrite", { buf = self.buf_nr })
+  -- Logs can be edited, e.g. reformatted, but there is nothing to write: `:w` fails instead of
+  -- reloading them, and the edits never block quitting. `:w {file}` saves them.
+  local buftype = self.subresource_kind == "logs" and "nofile" or "acwrite"
+  vim.api.nvim_set_option_value("buftype", buftype, { buf = self.buf_nr })
   vim.api.nvim_set_option_value("swapfile", false, { buf = self.buf_nr })
 end
 
