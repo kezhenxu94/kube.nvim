@@ -45,6 +45,8 @@ function KubeBuffer:new(buf_nr)
   buf_nr = buf_nr or vim.api.nvim_get_current_buf()
 
   if _G.kube_buffers[buf_nr] then
+    -- Reloading the buffer (`:e`) detaches it from the language server
+    require("kube.lsp").attach(buf_nr)
     return _G.kube_buffers[buf_nr]
   end
 

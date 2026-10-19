@@ -33,7 +33,8 @@ without it.
     Example: `:Kube get pods selector=app=web,tier=frontend`
 
 :Kube delete {kind} {name} [namespace={ns}]
-    Delete a resource after confirming.
+    Delete a resource after confirming. Without {ns}, in the `default`
+    namespace, whose resource names {name} completes.
 
 :Kube context [{context}]
     Switch the context used by new buffers, only in kube.nvim: the kubeconfig
@@ -82,6 +83,11 @@ Views of a resource ({sub} and {params}):
 Lists take kubectl flags as params, e.g. `?selector=app=web` or
 `?field-selector=involvedObject.name=web`.
 
+Lists of pods and nodes have CPU and MEMORY columns (`kubectl top`) when the
+cluster has the metrics API, e.g. with metrics-server. Statuses are shown as
+kubectl does: `CrashLoopBackOff`, `Init:0/1`, `NotReady,SchedulingDisabled`, ...
+Followed logs keep the cursor at the end when it is on the last line.
+
 ==============================================================================
 4. Keymaps                                                      *kube-keymaps*
 
@@ -129,8 +135,9 @@ so LSP keymaps and pickers work on them:
 
     Open, Describe, Go to YAML, Show events, Show logs, Follow logs, Show logs
     of all containers, Show logs of the previous instance, Show logs since…,
-    Exec, Forward port, Show port forwards, Set image, Scale…, Restart, Undo
-    rollout, Rollout history, Decode secret, Cordon, Uncordon, Drain, Delete
+    Exec, Debug (ephemeral container), Forward port, Show port forwards, Set
+    image, Scale…, Restart, Undo rollout, Rollout history, Trigger now (cron
+    jobs), Decode secret, Cordon, Uncordon, Drain, Delete
 
 Operations changing the cluster ask for confirmation, naming the context.
 
@@ -138,7 +145,8 @@ Operations changing the cluster ask for confirmation, naming the context.
 6. Editing                                                      *kube-editing*
 
 Lists: delete lines and |:w| to delete those resources, after confirming. The
-deleted lines stay visible, as virtual lines, until written or undone.
+deleted lines stay visible, as virtual lines, until written or undone. Deleted
+lines and edited cells are confirmed together.
 
 Edit cells and |:w| to apply them, after confirming all changes; |:w!|
 without confirming:
@@ -172,7 +180,10 @@ Defaults: >lua
       refresh_interval = 10000,
       -- kubectl --request-timeout, except for streams (logs -f, port-forward)
       request_timeout = "30s",
-      logs = { tail = 1000 }, -- -1 for all
+      logs = {
+        tail = 1000,       -- lines to fetch, -1 for all
+        max_lines = 10000, -- lines kept while following, -1 for all
+      },
       -- Overrides, by default linked to your colorscheme's groups:
       -- KubeBody (Normal), KubePending (DiagnosticWarn),
       -- KubeRunning (Normal), KubeFailed (DiagnosticError),

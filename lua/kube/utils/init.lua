@@ -72,39 +72,39 @@ function M.resource_type(resource)
   return kind
 end
 
-function M.calculate_age(created)
-  local year = created:sub(1, 4)
-  local month = created:sub(6, 7)
-  local day = created:sub(9, 10)
-  local hour = created:sub(12, 13)
-  local min = created:sub(15, 16)
-  local sec = created:sub(18, 19)
-
-  local creation_time_utc = os.time({
-    year = year,
-    month = month,
-    day = day,
-    hour = hour,
-    min = min,
-    sec = sec,
+---@param timestamp string An RFC 3339 UTC timestamp, e.g. 2026-01-01T00:00:00Z
+---@return integer The seconds since the epoch
+function M.parse_time(timestamp)
+  local time = os.time({
+    year = timestamp:sub(1, 4),
+    month = timestamp:sub(6, 7),
+    day = timestamp:sub(9, 10),
+    hour = timestamp:sub(12, 13),
+    min = timestamp:sub(15, 16),
+    sec = timestamp:sub(18, 19),
     isdst = false,
   })
+  -- os.time takes local time, the timestamp is UTC
+  return time - os.difftime(os.time(os.date("!*t")), os.time(os.date("*t")))
+end
 
-  local creation_time = creation_time_utc - os.difftime(os.time(os.date("!*t")), os.time(os.date("*t")))
-  local now = os.time()
-  local age_secs = os.difftime(now, creation_time)
-
-  if age_secs < 60 then
-    return string.format("%ds", age_secs)
-  elseif age_secs < 3600 then
-    local mins = math.floor(age_secs / 60)
-    local secs = age_secs % 60
-    return string.format("%dm%ds", mins, secs)
-  elseif age_secs < 86400 then
-    return string.format("%dh", math.floor(age_secs / 3600))
-  else
-    return string.format("%dd", math.floor(age_secs / 86400))
+---@param seconds number
+---@return string e.g. 42s, 5m3s, 2h, 7d
+function M.format_duration(seconds)
+  if seconds < 60 then
+    return string.format("%ds", seconds)
+  elseif seconds < 3600 then
+    return string.format("%dm%ds", math.floor(seconds / 60), seconds % 60)
+  elseif seconds < 86400 then
+    return string.format("%dh", math.floor(seconds / 3600))
   end
+  return string.format("%dd", math.floor(seconds / 86400))
+end
+
+---@param created string An RFC 3339 UTC timestamp
+---@return string The time since `created`
+function M.calculate_age(created)
+  return M.format_duration(os.difftime(os.time(), M.parse_time(created)))
 end
 
 ---The table header for the winbar of `win`, aligned with its number column and horizontal scroll.

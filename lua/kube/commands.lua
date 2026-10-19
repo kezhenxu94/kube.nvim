@@ -68,8 +68,10 @@ local DeleteCommand = {
       end
       return kinds
     elseif #args == 2 then
-      -- TODO: Could add completion for resource names here
-      return {}
+      -- Without namespace=, :Kube delete deletes in the default namespace
+      return vim.tbl_filter(function(name)
+        return vim.startswith(name, arglead or "")
+      end, require("kubectl").resource_names_sync(args[1], "default"))
     end
 
     -- Parameter completion

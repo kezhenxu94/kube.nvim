@@ -4,6 +4,7 @@
 ---@field subresource_formatters table<string, Formatter[]>|nil Map of subresource name to formatter
 ---@field empty string|nil Status shown when there are no rows
 ---@field editable table<string, KubeCellEditor>|nil Editors of the columns that `:w` applies, by header
+---@field metrics "pods"|"nodes"|nil The `kubectl top` kind of the rows, adds CPU and MEMORY columns to lists
 ---@class FormattedRow
 ---@field row table The row data containing column values
 ---@field item table The original resource item data
@@ -62,6 +63,10 @@ local formatters = {
   {
     { "cronjobs", "cronjob", "cronjobs.batch", "cronjob.batch" },
     require("kube.formatters.cronjobs"),
+  },
+  {
+    { "jobs", "job", "jobs.batch", "job.batch" },
+    require("kube.formatters.jobs"),
   },
   {
     { "daemonsets", "daemonset", "ds", "daemonsets.apps", "daemonset.apps" },

@@ -56,11 +56,23 @@ local M = {
       vim.bo[self.buf_nr].modifiable = true
       -- Replace the trailing placeholder line, then add a new one for the status
       local start = vim.api.nvim_buf_line_count(self.buf_nr)
+      -- Windows at the end keep showing the new lines, like `tail -f`
+      local at_end = vim.tbl_filter(function(win)
+        return vim.api.nvim_win_get_cursor(win)[1] >= start - 1
+      end, vim.fn.win_findbuf(self.buf_nr))
       vim.api.nvim_buf_set_lines(self.buf_nr, start - 1, -1, false, lines)
       vim.api.nvim_buf_set_lines(self.buf_nr, -1, -1, false, { "" })
+      local max_lines = require("kube.config").values.logs.max_lines
+      local excess = vim.api.nvim_buf_line_count(self.buf_nr) - 1 - max_lines
+      if max_lines >= 0 and excess > 0 then
+        vim.api.nvim_buf_set_lines(self.buf_nr, 0, excess, false, {})
+      end
       set_status("Waiting for new logs... (Ctrl+C to stop)")
       vim.bo[self.buf_nr].modifiable = false
       vim.bo[self.buf_nr].modified = false
+      for _, win in ipairs(at_end) do
+        vim.api.nvim_win_set_cursor(win, { vim.api.nvim_buf_line_count(self.buf_nr), 0 })
+      end
     end)
 
     if not job then

@@ -13,7 +13,7 @@
   "status": {
     "phase": "Running",
     "podIP": "10.0.0.1",
-    "initContainerStatuses": [{ "name": "init", "ready": false, "restartCount": 0, "state": { "terminated": { "exitCode": 0 } } }],
+    "initContainerStatuses": [{ "name": "init", "ready": false, "restartCount": 0, "state": { "terminated": { "exitCode": 0, "reason": "Completed" } } }],
     "containerStatuses": [
       { "name": "app", "ready": true, "restartCount": 1, "state": { "running": {} } },
       { "name": "sidecar", "ready": true, "restartCount": 2, "state": { "running": {} } }

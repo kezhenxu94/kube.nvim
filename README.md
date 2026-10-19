@@ -38,13 +38,15 @@ A buffer opened without `context/{context}/` is bound to the context that was cu
 
 * **Edit the cluster like a buffer**: delete lines and `:w` to delete resources (deleted lines stay visible until written); edit DESIRED (deployments, statefulsets, replicasets), IMAGE (containers) or SUSPENDED (cron jobs) cells and `:w` to scale, set the image or suspend; edit the YAML and `:w` to apply it, after reviewing `kubectl diff` (`:w!` skips the confirmation).
 * **LSP**: kube buffers have an in-process language server, so LSP keymaps and pickers work: `K` describes, `gd` / `<C-]>` jump to what the cell refers to, `gO` lists the resources, and `gra` offers every operation, on a visual selection for all selected resources.
-* **Operations**: scale, rollout restart / undo / history, cordon / uncordon / drain, set image, delete, with confirmations naming the context.
-* **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default.
+* **Operations**: scale, rollout restart / undo / history, cordon / uncordon / drain, set image, trigger a cron job now, delete, with confirmations naming the context.
+* **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default. Following keeps the cursor at the end, like `tail -f`.
 * **Events**: per namespace or for the resource under the cursor, warnings as diagnostics.
 * **Secrets**: view and edit decoded secret data.
 * **Port forwarding**: forward ports of pods, deployments and services, `gx` opens them.
-* **exec**: open a shell in a container right in Neovim.
+* **exec**: open a shell in a container right in Neovim. Or in an ephemeral debug container (`kubectl debug`), for images without a shell.
 * **Watch**: `gw` reloads a list periodically, keeping the cursor on the same resource.
+* **Statuses like kubectl**: `CrashLoopBackOff`, `ImagePullBackOff`, `Init:0/1`, `NotReady,SchedulingDisabled`, ...
+* **Metrics**: CPU and MEMORY columns for pods and nodes, when the cluster has the metrics API (metrics-server).
 * **Diagnostics**: unhealthy resources are diagnostics, `]d` jumps to the next one.
 
 ## Keymaps
@@ -99,7 +101,10 @@ require("kube").setup({
   refresh_interval = 10000,
   -- kubectl --request-timeout, for everything except streams (logs -f, port-forward, exec, drain)
   request_timeout = "30s",
-  logs = { tail = 1000 }, -- -1 for all
+  logs = {
+    tail = 1000, -- Lines to fetch, -1 for all
+    max_lines = 10000, -- Lines kept while following, -1 for all
+  },
   -- Highlight overrides, by default linked to your colorscheme's groups:
   -- KubeBody (Normal), KubePending (DiagnosticWarn), KubeRunning (Normal),
   -- KubeFailed (DiagnosticError), KubeSucceeded/KubeUnknown (Comment), KubeHeader (Title),

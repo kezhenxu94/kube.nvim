@@ -63,7 +63,7 @@ local function restore_cursors(saved, formatted_rows)
 end
 
 -- Columns that change on every reload, not worth showing as a change
-local VOLATILE_COLUMNS = { AGE = true, ["LAST SEEN"] = true }
+local VOLATILE_COLUMNS = { AGE = true, ["LAST SEEN"] = true, CPU = true, MEMORY = true }
 local FLASH_DURATION = 1500
 
 ---@param headers string[]
@@ -128,36 +128,142 @@ function M.formatter_for(buffer)
   return formatters[buffer.resource_kind]
 end
 
+---Contexts whose cluster has no metrics API, not asked again
+---@type table<string, boolean>
+local metrics_unavailable = {}
+
+---@alias KubeMetrics table<string, string[]> CPU and memory usage by "namespace/name"
+
+---@param output string The output of `kubectl top --no-headers`
+---@param kind "pods"|"nodes"
+---@param namespace string The namespace of the buffer, "all" for all namespaces
+---@return KubeMetrics
+local function parse_metrics(output, kind, namespace)
+  local metrics = {}
+  for _, line in ipairs(vim.split(output, "\n", { trimempty = true })) do
+    local fields = vim.split(vim.trim(line), "%s+")
+    if kind == "nodes" then
+      -- NAME CPU(cores) CPU(%) MEMORY(bytes) MEMORY(%)
+      metrics["/" .. fields[1]] = { fields[2], fields[4] }
+    elseif namespace:lower() == "all" then
+      metrics[fields[1] .. "/" .. fields[2]] = { fields[3], fields[4] }
+    else
+      metrics[namespace .. "/" .. fields[1]] = { fields[2], fields[3] }
+    end
+  end
+  return metrics
+end
+
+---A job that is closing once all `jobs` are.
+---@param jobs vim.SystemObj[]
+---@return vim.SystemObj
+local function all_jobs(jobs)
+  return {
+    pid = jobs[1].pid,
+    is_closing = function()
+      for _, job in ipairs(jobs) do
+        if not job:is_closing() then
+          return false
+        end
+      end
+      return true
+    end,
+    kill = function()
+      for _, job in ipairs(jobs) do
+        require("kubectl").kill(job)
+      end
+    end,
+  }
+end
+
 ---@param buffer KubeBuffer The buffer to render into
 function M.load(buffer)
   log.debug("loading buffer", buffer.resource_kind, buffer.resource_name, buffer.namespace, buffer.params)
 
-  local job = require("kubectl").get(
+  local kubectl = require("kubectl")
+  local formatter = M.formatter_for(buffer)
+  local kind = not buffer.resource_name and formatter.metrics
+  local with_metrics = kind and not metrics_unavailable[buffer.context]
+
+  -- Render once the resources and, if asked, their metrics are loaded
+  local data, metrics
+  local pending = with_metrics and 2 or 1
+  local function loaded()
+    pending = pending - 1
+    if pending == 0 and data and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+      M.render(buffer, formatter, data, metrics)
+    end
+  end
+
+  local job = kubectl.get(
     buffer.context,
     buffer.resource_kind,
     buffer.resource_name,
     buffer.namespace,
     buffer.params,
     function(result)
+      -- The jobs of a wiped buffer are killed, ending without output
       if result and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
-        M.render(buffer, M.formatter_for(buffer), vim.json.decode(result))
+        data = vim.json.decode(result)
       end
+      loaded()
     end,
     buffer:on_error()
   )
-
-  if job then
-    buffer.jobs[job.pid] = job
+  if not job then
+    return nil
+  end
+  buffer.jobs[job.pid] = job
+  if not with_metrics then
+    return job
   end
 
-  return job
+  local top = kubectl.top(buffer.context, kind, buffer.namespace, (buffer.params or {}).selector, function(result)
+    metrics = result and parse_metrics(result, kind, buffer.namespace)
+    loaded()
+  end, function(err)
+    log.debug("no metrics", err)
+    if err:find("Metrics API not available", 1, true) then
+      metrics_unavailable[buffer.context] = true
+    end
+  end)
+  if not top then
+    loaded()
+    return job
+  end
+  buffer.jobs[top.pid] = top
+  return all_jobs({ job, top })
+end
+
+---Insert the CPU and memory usage columns before AGE.
+---@param headers string[]
+---@param rows FormattedRow[]
+---@param metrics KubeMetrics
+---@return string[] headers
+local function add_metrics(headers, rows, metrics)
+  local at = #headers + 1
+  for i, header in ipairs(headers) do
+    if header == "AGE" then
+      at = i
+    end
+  end
+  for _, row in ipairs(rows) do
+    local usage = metrics[(row.item.metadata.namespace or "") .. "/" .. row.item.metadata.name] or {}
+    table.insert(row.row, at, usage[1] or "")
+    table.insert(row.row, at + 1, usage[2] or "")
+  end
+  headers = vim.list_extend({}, headers)
+  table.insert(headers, at, "CPU")
+  table.insert(headers, at + 1, "MEMORY")
+  return headers
 end
 
 ---Render the rows of `data` as a table, keeping the cursors on the same rows.
 ---@param buffer KubeBuffer The buffer to render into
 ---@param formatter Formatter
 ---@param data table|nil The decoded kubectl output
-function M.render(buffer, formatter, data)
+---@param metrics KubeMetrics|nil The usage of the resources, adds CPU and MEMORY columns
+function M.render(buffer, formatter, data, metrics)
   local self = buffer
   -- Edits made while a background reload was running win over the reload
   if self.silent and vim.bo[self.buf_nr].modified then
@@ -177,10 +283,13 @@ function M.render(buffer, formatter, data)
   self.data = data
 
   local rows = formatter.format(data, self)
+  if metrics then
+    headers = add_metrics(headers, rows, metrics)
+  end
 
   self:setup()
 
-  local header_row, formatted_rows, col_widths = M.format_table(headers, rows)
+  local header_row, formatted_rows = M.format_table(headers, rows)
   self.header_row = header_row
   utils.update_winbar(self)
 
@@ -215,24 +324,21 @@ function M.render(buffer, formatter, data)
       end
     end
 
-    local col_pos = 0
-    for i, col_width in ipairs(col_widths) do
-      -- Same widths and separator as `align_row`
-      local width = math.min(MAX_COLUMN_WIDTH, col_width)
+    for i, range in ipairs(row.ranges) do
       -- Text typed at either end of the cell, as by `ciw`, stays in the cell
-      local mark_id = vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, col_pos, {
-        end_col = col_pos + width,
-        right_gravity = false,
-        end_right_gravity = true,
-        hl_group = row.highlights and row.highlights[headers[i]],
-      })
+      local mark_id =
+        vim.api.nvim_buf_set_extmark(self.buf_nr, constants.KUBE_COLUMN_NAMESPACE, row_num - 1, range[1], {
+          end_col = range[2],
+          right_gravity = false,
+          end_right_gravity = true,
+          hl_group = row.highlights and row.highlights[headers[i]],
+        })
       self.mark_columns[mark_id] = {
         item = row.raw,
         column = headers[i],
-        text = vim.trim(row.formatted:sub(col_pos + 1, col_pos + width)),
+        text = vim.trim(row.formatted:sub(range[1] + 1, range[2])),
         row_mark = row_mark,
       }
-      col_pos = col_pos + width + #COLUMN_SEPARATOR
     end
 
     for _, diagnostic in ipairs(row.diagnostics or {}) do
@@ -294,9 +400,38 @@ function M.show_pending(buffer)
   end
 end
 
+---@param text string
+---@return integer The display width
+local function display_width(text)
+  -- Most cells are ASCII, where the width is the length
+  if not text:find("[\128-\255]") then
+    return #text
+  end
+  return vim.api.nvim_strwidth(text)
+end
+
+---@param text string
+---@param width integer
+---@return string `text` cut to `width` display cells, ending with "..."
+local function truncate(text, width)
+  if not text:find("[\128-\255]") then
+    return text:sub(1, width - 3) .. "..."
+  end
+  local chars, used = {}, 0
+  for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+    used = used + vim.api.nvim_strwidth(char)
+    if used > width - 3 then
+      break
+    end
+    table.insert(chars, char)
+  end
+  return table.concat(chars) .. "..."
+end
+
 ---@class FormattedTableRow
 ---@field formatted string The formatted line with proper column spacing
 ---@field cells string[] The values of the columns
+---@field ranges integer[][] The 0-indexed byte range [start, end) of each column in `formatted`
 ---@field highlights table<string, string>|nil Highlight groups of cells, by header
 ---@field highlight string|nil The highlight group of the header row
 ---@field raw table The original row data
@@ -312,15 +447,17 @@ function M.format_table(headers, rows)
   for i, header in ipairs(headers) do
     col_widths[i] = #header
     for _, row in ipairs(rows) do
-      col_widths[i] = math.max(col_widths[i], #(row.row[i] or ""))
+      col_widths[i] = math.max(col_widths[i], display_width(row.row[i] or ""))
     end
   end
 
   local formatted_rows = {}
 
   for _, row in ipairs(rows) do
+    local formatted, ranges = M.align_row(row.row, col_widths)
     table.insert(formatted_rows, {
-      formatted = M.align_row(row.row, col_widths),
+      formatted = formatted,
+      ranges = ranges,
       cells = row.row,
       highlights = row.highlights,
       diagnostics = row.diagnostics,
@@ -337,22 +474,27 @@ function M.format_table(headers, rows)
     col_widths
 end
 
----@param row FormattedRow List of columns
+---@param row string[] The values of the columns
 ---@param col_widths number[] List of column widths
 ---@return string Formatted row string
+---@return integer[][] The 0-indexed byte range [start, end) of each column
 function M.align_row(row, col_widths)
-  local formatted_cols = {}
-  for i, col in ipairs(row) do
-    if i <= #col_widths then
-      local width = math.min(MAX_COLUMN_WIDTH, col_widths[i])
-      local col_str = col or ""
-      if #col_str > width then
-        col_str = col_str:sub(1, width - 3) .. "..."
-      end
-      table.insert(formatted_cols, string.format("%-" .. width .. "s", col_str))
+  local formatted_cols, ranges = {}, {}
+  local pos = 0
+  for i, col_width in ipairs(col_widths) do
+    local width = math.min(MAX_COLUMN_WIDTH, col_width)
+    local col_str = row[i] or ""
+    local col_display_width = display_width(col_str)
+    if col_display_width > width then
+      col_str = truncate(col_str, width)
+      col_display_width = display_width(col_str)
     end
+    col_str = col_str .. string.rep(" ", width - col_display_width)
+    table.insert(formatted_cols, col_str)
+    table.insert(ranges, { pos, pos + #col_str })
+    pos = pos + #col_str + #COLUMN_SEPARATOR
   end
-  return table.concat(formatted_cols, COLUMN_SEPARATOR)
+  return table.concat(formatted_cols, COLUMN_SEPARATOR), ranges
 end
 
 return M

@@ -18,6 +18,7 @@ local actions = {
   containers = require("kube.actions.container"),
   deployment = require("kube.actions.deployment"),
   cronjob = require("kube.actions.cronjob"),
+  job = require("kube.actions.job"),
   daemonset = require("kube.actions.daemonset"),
   statefulset = require("kube.actions.statefulset"),
   replicaset = require("kube.actions.replicaset"),

@@ -231,6 +231,22 @@ local function single_operations(kbuf, resource)
     end)
   end
 
+  if kind == "Pod" then
+    add("Debug (ephemeral container)", function()
+      require("kube.utils.exec").prompt_debug(kbuf.context, resource)
+    end)
+  end
+
+  if kind == "CronJob" then
+    add("Trigger now", function()
+      -- Job names are at most 63 characters, as they are label values
+      local job = string.format("%s-manual-%d", resource.metadata.name:sub(1, 45), os.time())
+      confirmed(kbuf, { resource }, "Trigger", function(r, callback, on_error)
+        kubectl.create_job(kbuf.context, r.metadata.name, r.metadata.namespace, job, callback, on_error)
+      end)
+    end)
+  end
+
   if kind == "Secret" then
     add("Decode secret", function()
       helpers.open_resource(kbuf, resource, "data")

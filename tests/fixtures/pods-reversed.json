@@ -82,7 +82,8 @@
             "restartCount": 0,
             "state": {
               "terminated": {
-                "exitCode": 0
+                "exitCode": 0,
+                "reason": "Completed"
               }
             }
           }

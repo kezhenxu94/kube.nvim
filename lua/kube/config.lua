@@ -2,7 +2,7 @@
 ---@field keymaps table<string, string>|nil
 ---@field refresh_interval integer|false|nil
 ---@field request_timeout string|nil
----@field logs {tail: integer}|nil
+---@field logs {tail: integer, max_lines: integer}|nil
 ---@field highlights Highlights|nil
 local M = {}
 
@@ -34,6 +34,8 @@ function M.defaults()
     logs = {
       -- Number of lines to fetch, -1 for all
       tail = 1000,
+      -- Lines kept while following, the oldest are dropped, -1 for all
+      max_lines = 10000,
     },
   }
 end

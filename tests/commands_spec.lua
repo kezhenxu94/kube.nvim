@@ -116,6 +116,12 @@ describe(":Kube completion", function()
     t.eq({ "selector" }, vim.fn.getcompletion("Kube get pods s", "cmdline"))
   end)
 
+  it("completes delete names in the default namespace", function()
+    t.respond("*get pods -o name -n default*", { stdout = "pod/web-1\npod/web-2\npod/db\n" })
+    t.eq({ "web-1", "web-2" }, vim.fn.getcompletion("Kube delete pods we", "cmdline"))
+    t.eq({ "--context completion-ctx get pods -o name -n default" }, t.calls())
+  end)
+
   it("completes context names", function()
     t.respond("*get-contexts*", { stdout = "prod\nstaging\n" })
     t.eq({ "staging" }, vim.fn.getcompletion("Kube context st", "cmdline"))

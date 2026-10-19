@@ -428,6 +428,68 @@ function M.exec_cmd(context, kind, name, namespace, container)
   return with_context(context, args)
 end
 
+---Build the argv for an interactive `kubectl debug` session in an ephemeral container of a pod.
+---@param context string|nil The context to run against
+---@param name string The name of the pod
+---@param namespace string|nil The namespace of the pod
+---@param image string The image of the debug container
+---@param target string|nil The container whose process namespace to share
+---@return string[]
+function M.debug_cmd(context, name, namespace, image, target)
+  local args = { "debug", "-it", ref("pod", name), "--image=" .. image }
+  vim.list_extend(args, namespace_args(namespace))
+  if target then
+    table.insert(args, "--target=" .. target)
+  end
+  vim.list_extend(args, { "--", "sh" })
+  return with_context(context, args)
+end
+
+---Create a job from a cron job, to run it now.
+---@param context string|nil The context to run against
+---@param cronjob string The name of the cron job
+---@param namespace string|nil
+---@param job string The name of the job to create
+---@param callback fun(data: string|nil)|nil
+---@param on_error fun(data: string)|nil
+function M.create_job(context, cronjob, namespace, job, callback, on_error)
+  local args = { "create", "job", job, "--from=" .. ref("cronjob", cronjob) }
+  return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback, on_error)
+end
+
+---Resource usage from the metrics API (`kubectl top`).
+---@param context string|nil The context to run against
+---@param kind "pods"|"nodes"
+---@param namespace string|nil The namespace of pods, "all" for all namespaces
+---@param selector string|nil A label selector of pods
+---@param callback fun(data: string|nil)
+---@param on_error fun(data: string)|nil
+---@return vim.SystemObj|nil
+function M.top(context, kind, namespace, selector, callback, on_error)
+  local args = { "top", kind, "--no-headers" }
+  if kind == "pods" then
+    if namespace and namespace:lower() == "all" then
+      table.insert(args, "--all-namespaces")
+    else
+      vim.list_extend(args, namespace_args(namespace))
+    end
+    if selector then
+      table.insert(args, "--selector=" .. selector)
+    end
+  end
+  return kubectl(context, args, callback, on_error)
+end
+
+---@param kind string
+---@param namespace string|nil
+---@return string[] The names of the resources of `kind`, in the current context
+function M.resource_names_sync(kind, namespace)
+  local names = kubectl_sync(_G.kube.context, vim.list_extend({ "get", kind, "-o", "name" }, namespace_args(namespace)))
+  return vim.tbl_map(function(name)
+    return (name:gsub("^.-/", ""))
+  end, names)
+end
+
 ---Kill a job if it is still running.
 ---@param job vim.SystemObj|nil
 function M.kill(job)

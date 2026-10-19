@@ -408,6 +408,67 @@ describe("operations", function()
     t.eq({ "--context ctx-a logs pod/web-1 -n ns1 --tail=1000 --previous" }, t.calls_matching("logs"))
   end)
 
+  it("trigger a cron job now", function()
+    t.respond("*get cronjobs -o json*", {
+      stdout = vim.json.encode({
+        items = {
+          {
+            apiVersion = "batch/v1",
+            kind = "CronJob",
+            metadata = { name = "report", namespace = "ns1", creationTimestamp = "2026-01-01T00:00:00Z" },
+            spec = { schedule = "0 * * * *" },
+            status = {},
+          },
+        },
+      }),
+    })
+    t.respond("*create job*", { stdout = "job.batch/report-manual-1 created" })
+    local seen = prompts()
+    open("kube://namespaces/ns1/cronjobs")
+    t.press_on("report", "")
+    code_action("Trigger now")
+    wait_call("create job")
+    t.eq({ "Trigger cronjob.batch/report (context: ctx-a)?" }, seen)
+    local call = t.calls_matching("create job")[1]
+    t.ok(call:match("^%-%-context ctx%-a create job report%-manual%-%d+ %-%-from=cronjob/report %-n ns1$"), call)
+  end)
+
+  it("debug a pod in an ephemeral container", function()
+    local cmd
+    t.stub(vim.fn, "jobstart", function(c)
+      cmd = c
+      return 1
+    end)
+    t.answer_prompts(function(items)
+      return items[2]
+    end, "nicolaka/netshoot")
+    open("kube://namespaces/ns1/pods")
+    t.press_on("web-1", "")
+    code_action("Debug (ephemeral container)")
+    t.wait_for(function()
+      return cmd
+    end, "kubectl debug")
+    vim.cmd.stopinsert()
+    t.eq({
+      "kubectl",
+      "--context",
+      "ctx-a",
+      "debug",
+      "-it",
+      "pod/web-1",
+      "--image=nicolaka/netshoot",
+      "-n",
+      "ns1",
+      "--target=sidecar",
+      "--",
+      "sh",
+    }, cmd)
+    t.eq(
+      "kube://context/ctx-a/namespaces/ns1/pod/web-1/debug?image=nicolaka/netshoot&target=sidecar",
+      vim.api.nvim_buf_get_name(0)
+    )
+  end)
+
   it("on a range apply to all selected resources", function()
     t.respond("*delete*", { stdout = "deleted" })
     local seen = prompts()
@@ -530,6 +591,16 @@ describe("language server", function()
         return client.name
       end, vim.lsp.get_clients({ bufnr = 0 }))
     )
+  end)
+
+  it("stays attached, with the keymaps, after :e reloads the buffer", function()
+    open("kube://namespaces/ns1/pods")
+    wait_lsp()
+    vim.cmd.edit()
+    t.wait_loaded()
+    wait_lsp()
+    t.ok(vim.fn.maparg("g?", "n", false, true).buffer == 1, "buffer keymaps")
+    t.eq(1, #vim.lsp.get_clients({ name = "kube" }), "the same server")
   end)
 
   it("reports hover progress while kubectl describes", function()
@@ -734,5 +805,40 @@ describe("editing cells", function()
     vim.cmd("write!")
     wait_call("set image")
     t.eq({ "--context ctx-a set image pod/web-1 app=web:2 -n ns1" }, t.calls_matching("set image"))
+  end)
+end)
+
+describe("metrics", function()
+  it("adds CPU and MEMORY columns from kubectl top", function()
+    t.respond("*top pods*", { stdout = "web-1   12m   34Mi\n" })
+    open(PODS)
+    t.eq({ "--context ctx-a top pods --no-headers -n ns1" }, t.calls_matching("top"))
+    local kbuf = _G.kube_buffers[vim.api.nvim_get_current_buf()]
+    t.ok(kbuf.header_row.formatted:match("NODE%s+CPU%s+MEMORY%s+AGE"), kbuf.header_row.formatted)
+    t.ok(t.lines()[1]:match("^ns1%s+web%-1 .* node%-1%s+12m%s+34Mi%s+%d"), t.lines()[1])
+    t.ok(t.lines()[2]:match("Pending%s+0%s+%d+[smhd]"), t.lines()[2])
+  end)
+
+  it("are not asked again when the cluster has no metrics API", function()
+    t.respond("*top nodes*", { stderr = "error: Metrics API not available", code = 1 })
+    open("kube://context/ctx-c/nodes")
+    t.ok(t.lines()[1]:match("^node%-1%s+Ready"), t.lines()[1])
+    vim.cmd("normal R")
+    t.wait_loaded()
+    t.eq(2, #t.calls_matching("get nodes"))
+    t.eq(1, #t.calls_matching("top nodes"))
+  end)
+end)
+
+describe("following logs", function()
+  it("keeps the cursor at the end and drops the oldest lines", function()
+    t.stub(require("kube.config").values.logs, "max_lines", 3)
+    t.respond("*logs*", { script = "printf 'a\\nb\\n'; sleep 0.2; printf 'c\\nd\\ne\\n'; sleep 30" })
+    vim.cmd.edit("kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?follow=true")
+    t.wait_for(function()
+      return t.lines()[1] == "c"
+    end, "the oldest lines to be dropped")
+    t.eq({ "c", "d", "e", "" }, t.lines())
+    t.eq(4, vim.api.nvim_win_get_cursor(0)[1])
   end)
 end)

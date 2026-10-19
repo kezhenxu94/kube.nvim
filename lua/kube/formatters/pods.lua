@@ -1,23 +1,24 @@
-local log = require("kube.log")
+local pod_status = require("kube.formatters.status")
 local utils = require("kube.utils")
-local finished_statuses = { "Completed", "Succeeded" }
+local finished_statuses = { Completed = true, Succeeded = true }
 local severity_map = {
   Pending = vim.diagnostic.severity.WARN,
   Failed = vim.diagnostic.severity.ERROR,
-  Terminating = vim.diagnostic.severity.INFO,
 }
 
 ---@type Formatter
 local M = {
   headers = { "NAMESPACE", "NAME", "READY", "STATUS", "RESTARTS", "IP", "NODE", "AGE" },
+  metrics = "pods",
 
   format = function(data)
     local rows = {}
     for _, pod in ipairs(data.items) do
       local name = pod.metadata.name
       local namespace = pod.metadata.namespace
-      local status = pod.status.phase
-      local highlights = { STATUS = "Kube" .. status }
+      local phase = pod.status.phase
+      local status = pod_status.pod(pod)
+      local highlights = { STATUS = pod_status.highlight(status) }
 
       local ready_count = 0
       local container_count = #pod.spec.containers
@@ -33,11 +34,6 @@ local M = {
       if status == "Running" and ready_count < container_count then
         highlights.READY = "KubePending"
       end
-      -- Like kubectl: a pod being deleted is shown as Terminating whatever its phase
-      if pod.metadata.deletionTimestamp and pod.metadata.deletionTimestamp ~= vim.NIL then
-        status = "Terminating"
-        highlights.STATUS = "KubePending"
-      end
 
       local restarts = 0
       if pod.status.containerStatuses then
@@ -49,32 +45,30 @@ local M = {
         highlights.RESTARTS = "KubePending"
       end
 
+      local severity
+      if status == "Terminating" then
+        severity = vim.diagnostic.severity.INFO
+      elseif highlights.STATUS == "KubeFailed" then
+        severity = vim.diagnostic.severity.ERROR
+      else
+        severity = severity_map[phase] or vim.diagnostic.severity.ERROR
+      end
+
       local diagnostics = {}
-      if not vim.tbl_contains(finished_statuses, status) then
-        if pod.status.conditions then
-          if #pod.status.conditions == 1 then
-            local condition = pod.status.conditions[1]
-            local message = condition.message or condition.reason
-            table.insert(diagnostics, {
-              message = string.format("The pod is not ready: %s", message),
-              severity = severity_map[status] or vim.diagnostic.severity.ERROR,
-            })
-          end
-          log.debug("pod.status.conditions", pod.status.conditions)
-          for _, condition in ipairs(pod.status.conditions) do
-            if condition.type == "Ready" and condition.status ~= "True" then
-              local message = condition.message or condition.reason
+      if not finished_statuses[status] then
+        local conditions = pod.status.conditions
+        if conditions then
+          for _, condition in ipairs(conditions) do
+            -- A single condition is the reason the pod is not ready yet, e.g. it cannot be scheduled
+            if (#conditions == 1 or condition.type == "Ready") and condition.status ~= "True" then
               table.insert(diagnostics, {
-                message = string.format("The pod is not ready: %s", message),
-                severity = severity_map[status] or vim.diagnostic.severity.ERROR,
+                message = string.format("The pod is not ready: %s", condition.message or condition.reason),
+                severity = severity,
               })
             end
           end
         elseif pod.status.message then
-          table.insert(diagnostics, {
-            message = pod.status.message,
-            severity = severity_map[status] or vim.diagnostic.severity.ERROR,
-          })
+          table.insert(diagnostics, { message = pod.status.message, severity = severity })
         end
       end
 
