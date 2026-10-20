@@ -103,6 +103,21 @@ describe("canonical buffer names", function()
     t.eq("kube://context/ctx-a/pods/ns", canonical_name("kube://pods/ns"))
   end)
 
+  it("expands helm to helm-releases", function()
+    t.eq("kube://context/ctx-a/helm-releases", canonical_name("kube://helm"))
+    t.eq("kube://context/c/namespaces/prod/helm-releases", canonical_name("kube://context/c/ns/prod/helm"))
+    t.eq(
+      "kube://context/ctx-a/namespaces/prod/helm-releases/web/values?all=true",
+      canonical_name("kube://ns/prod/helm/web/values?all=true")
+    )
+    t.eq("kube://context/ctx-a/helm-releases?a", canonical_name("kube://helm?a"))
+    -- A namespace named helm, a pod named helm
+    t.eq("kube://context/ctx-a/namespaces/helm/pods", canonical_name("kube://ns/helm/pods"))
+    t.eq("kube://context/ctx-a/namespaces/helm", canonical_name("kube://ns/helm"))
+    t.eq("kube://context/ctx-a/pods/helm", canonical_name("kube://pods/helm"))
+    t.eq("kube://context/ctx-a/helmcharts", canonical_name("kube://helmcharts"))
+  end)
+
   it("lists the resource types without a kind", function()
     t.eq("kube://context/ctx-a/api-resources", canonical_name("kube://"))
     t.eq("kube://context/c/api-resources", canonical_name("kube://context/c"))

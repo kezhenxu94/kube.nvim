@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fake helm for tests: the fake kubectl records and replies to it as `helm {args}`
+exec "$(dirname "$0")/kubectl" helm "$@"

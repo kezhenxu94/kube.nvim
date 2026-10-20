@@ -1,0 +1,1 @@
+[{"name":"web","namespace":"ns1","revision":"3","updated":"2026-01-01 08:00:00.123456 +0800 CST","status":"deployed","chart":"web-1.2.0","app_version":"1.2"},{"name":"db","namespace":"ns2","revision":"1","updated":"2026-01-01 00:00:00.5 +0000 UTC","status":"failed","chart":"postgresql-15.0.0","app_version":"16.1"}]

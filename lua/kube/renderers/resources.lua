@@ -21,6 +21,10 @@ local function row_identity(item)
   if item.local_port then
     return string.format("%s:%s", item.id, item.local_port)
   end
+  -- Helm releases of the same name in different namespaces
+  if item.namespace then
+    return item.namespace .. "/" .. item.name
+  end
   return item.name
 end
 
@@ -356,7 +360,11 @@ function M.render(buffer, formatter, data, metrics)
   if #diagnostics > 0 then
     vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr, diagnostics, {})
   end
-  -- After the diagnostics, whose signs may change the width of the sign column the header is aligned with
+  -- After the diagnostics, whose signs may change the width of the sign column the header is aligned with.
+  -- A narrower sign column ('signcolumn' auto) is only computed by a redraw.
+  if #vim.fn.win_findbuf(self.buf_nr) > 0 then
+    vim.cmd.redraw()
+  end
   utils.update_winbar(self)
   -- Only reloads of a watched list: a reload asked for shows the changes it was asked for
   if self.silent then

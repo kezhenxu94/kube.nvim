@@ -212,6 +212,101 @@ local function portforward_operations(kbuf, forwards)
   return operations
 end
 
+---Operations on Helm releases, of `helm-releases` rows, or on the revisions of a release's history.
+---@param kbuf KubeBuffer
+---@param items table[]
+---@return KubeOperation[]
+local function helm_operations(kbuf, items)
+  local helm = require("helm")
+  local open = require("kube.actions.helmrelease").open
+  local function confirmed_helm(verb, targets, call)
+    confirm(string.format("%s %s (context: %s)?", verb, targets, kbuf.context), function(yes)
+      if yes then
+        run_kubectl(kbuf, items, call)
+      end
+    end)
+  end
+
+  if kbuf.subresource_kind == "history" then
+    if #items ~= 1 then
+      return {}
+    end
+    local revision = items[1]
+    local release = { name = revision.release, namespace = revision.namespace }
+    return {
+      {
+        title = string.format("Rollback to revision %d", revision.revision),
+        run = function()
+          local target =
+            string.format("helm release %s/%s to revision %d", release.namespace, release.name, revision.revision)
+          confirmed_helm("Roll back", target, function(r, callback, on_error)
+            helm.rollback(kbuf.context, r.release, r.namespace, r.revision, callback, on_error)
+          end)
+        end,
+      },
+      {
+        title = string.format("Show manifest of revision %d", revision.revision),
+        run = function()
+          open(kbuf, release, "manifest", { revision = revision.revision })
+        end,
+      },
+      {
+        title = string.format("Show values of revision %d", revision.revision),
+        run = function()
+          open(kbuf, release, "values", { revision = revision.revision })
+        end,
+      },
+    }
+  end
+
+  local operations = {}
+  if #items == 1 then
+    local release = items[1]
+    for _, view in ipairs({
+      { "Show manifest", "manifest" },
+      { "Show values", "values" },
+      { "Show all values", "values", { all = true } },
+      { "Show notes", "notes" },
+      { "Show status" },
+      { "Show history", "history" },
+    }) do
+      table.insert(operations, {
+        title = view[1],
+        run = function()
+          open(kbuf, release, view[2], view[3])
+        end,
+      })
+    end
+    if (release.revision or 0) > 1 then
+      table.insert(operations, {
+        title = "Rollback to the previous revision",
+        run = function()
+          confirmed_helm(
+            "Roll back",
+            string.format("helm release %s/%s", release.namespace, release.name),
+            function(r, callback, on_error)
+              helm.rollback(kbuf.context, r.name, r.namespace, nil, callback, on_error)
+            end
+          )
+        end,
+      })
+    end
+  end
+
+  local names = vim.tbl_map(function(release)
+    return string.format("%s/%s", release.namespace, release.name)
+  end, items)
+  table.insert(operations, {
+    title = #items == 1 and "Uninstall" or string.format("Uninstall %d releases", #items),
+    run = function()
+      confirmed_helm("Uninstall", "helm release " .. table.concat(names, ", "), function(r, callback, on_error)
+        helm.uninstall(kbuf.context, r.name, r.namespace, callback, on_error)
+      end)
+    end,
+  })
+  return operations
+end
+
 ---@param kbuf KubeBuffer
 ---@param resource table
 ---@return KubeOperation[]
@@ -453,6 +548,9 @@ function M.for_items(kbuf, items)
   end
   if kbuf.resource_kind == "portforwards" or kbuf.subresource_kind == "portforward" then
     return portforward_operations(kbuf, items)
+  end
+  if kbuf.resource_kind == "helm-releases" then
+    return helm_operations(kbuf, items)
   end
 
   local resources = vim.tbl_filter(function(item)

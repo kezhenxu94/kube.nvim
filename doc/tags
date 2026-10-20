@@ -9,6 +9,7 @@ kube-config	kube.txt	/*kube-config*
 kube-contents	kube.txt	/*kube-contents*
 kube-editing	kube.txt	/*kube-editing*
 kube-health	kube.txt	/*kube-health*
+kube-helm	kube.txt	/*kube-helm*
 kube-jump	kube.txt	/*kube-jump*
 kube-keymaps	kube.txt	/*kube-keymaps*
 kube-lsp	kube.txt	/*kube-lsp*

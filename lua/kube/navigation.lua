@@ -62,7 +62,8 @@ end
 
 ---The buffer the cell at `pos` refers to, like a tag:
 ---NAMESPACE -> the same list in that namespace, NODE -> the node, an event's OBJECT -> that object,
----a namespace row -> its pods, a resource type -> its list, anything else -> the resource's definition (YAML).
+---a namespace row -> its pods, a resource type -> its list, a Helm release -> its values,
+---a revision -> its manifest, anything else -> the resource's definition (YAML).
 ---@param kbuf KubeBuffer
 ---@param pos integer[] (0,0)-indexed position
 ---@return string|nil
@@ -71,6 +72,28 @@ function M.tag_target(kbuf, pos)
   local item = cell and cell.item
   if item and item.kind == "APIResource" then
     return M.api_resource_target(kbuf, item)
+  end
+  if item and item.kind == "HelmRelease" then
+    if cell.column == "NAMESPACE" then
+      return utils.buf_name({ context = kbuf.context, namespace = item.namespace, kind = "helm-releases" })
+    end
+    return utils.buf_name({
+      context = kbuf.context,
+      namespace = item.namespace,
+      kind = "helm-releases",
+      name = item.name,
+      subresource = "values",
+    })
+  end
+  if item and item.kind == "HelmRevision" then
+    return utils.buf_name({
+      context = kbuf.context,
+      namespace = item.namespace,
+      kind = "helm-releases",
+      name = item.release,
+      subresource = "manifest",
+      params = { revision = item.revision },
+    })
   end
   if not item or not item.metadata then
     return nil

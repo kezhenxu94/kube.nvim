@@ -8,7 +8,10 @@ local timer
 ---@param kbuf KubeBuffer
 ---@return boolean
 function M.is_table(kbuf)
-  return not kbuf.resource_name or kbuf.subresource_kind == "containers" or kbuf.subresource_kind == "portforward"
+  return not kbuf.resource_name
+    or kbuf.subresource_kind == "containers"
+    or kbuf.subresource_kind == "portforward"
+    or (kbuf.resource_kind == "helm-releases" and kbuf.subresource_kind == "history")
 end
 
 ---@param kbuf KubeBuffer

@@ -65,6 +65,14 @@ local formatters = {
     require("kube.formatters.portforwards"),
   },
   {
+    { "helm-releases" },
+    require("kube.formatters.helm_releases"),
+  },
+  {
+    { "helm-history" },
+    require("kube.formatters.helm_history"),
+  },
+  {
     { "cronjobs", "cronjob", "cronjobs.batch", "cronjob.batch" },
     require("kube.formatters.cronjobs"),
   },

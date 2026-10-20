@@ -23,6 +23,9 @@ local GetCommand = {
   complete = function(arglead, args)
     if #args <= 1 then
       local kinds = require("kubectl").api_resources_sync()
+      if vim.fn.executable("helm") == 1 then
+        kinds = vim.list_extend({ "helm-releases", "helm" }, kinds)
+      end
       if arglead and arglead ~= "" then
         return vim.tbl_filter(function(kind)
           return vim.startswith(kind:lower(), arglead:lower())

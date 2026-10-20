@@ -1,5 +1,5 @@
 ---In-process language server for kube buffers, so that LSP keymaps and pickers work on them:
----hover = describe, definition = what the cell refers to (see `kube.navigation`),
+---hover = describe (`helm status` of a release), definition = what the cell refers to (see `kube.navigation`),
 ---document symbols = the resources, code actions = `kube.operations` (on a range: bulk operations),
 ---selection ranges = cell -> row -> list, for the default |an| / |in|, declaration = the owner,
 ---references = the pods using the resource, code lenses = the operations on the containers of a YAML.
@@ -178,6 +178,11 @@ local handlers = {
       run = function(callback, on_error)
         kubectl.explain(kbuf.context, resource.name, callback, on_error)
       end
+    elseif resource and resource.kind == "HelmRelease" then
+      title = "Getting the status of helm release " .. resource.name
+      run = function(callback, on_error)
+        require("helm").status(kbuf.context, resource.name, resource.namespace, callback, on_error)
+      end
     elseif resource and resource.metadata and resource.kind then
       local resource_type = utils.resource_type(resource)
       title = string.format("Describing %s/%s", resource_type, resource.metadata.name)
@@ -326,7 +331,7 @@ local handlers = {
         if name and mark[2] <= last then
           table.insert(symbols, {
             name = name,
-            detail = item.metadata and item.metadata.namespace or nil,
+            detail = item.metadata and item.metadata.namespace or item.namespace,
             kind = vim.lsp.protocol.SymbolKind.Object,
             range = line_range(mark[2]),
             selectionRange = line_range(mark[2]),

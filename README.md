@@ -6,7 +6,7 @@ Neovim Kubernetes plugin, manage your Kubernetes resources like a buffer!
 
 ## Installation
 
-Requirements: Neovim >= 0.11 and `kubectl` in `$PATH`. No other plugin dependencies.
+Requirements: Neovim >= 0.11 and `kubectl` in `$PATH`, `helm` too for Helm releases. No other plugin dependencies.
 
 With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
@@ -25,6 +25,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 * `:Kube context`: Select the context to use, `:Kube context production` to switch to `production`. Only kube.nvim is affected, not your kubeconfig.
 * `:Kube apply` / `:Kube diff`: Apply / diff the current buffer as a manifest, `:Kube! apply` applies without confirming.
 * `:Kube portforwards`: All port forwards, delete a line and `:w` to stop one.
+* `:Kube get helm`: Helm releases in all namespaces, `helm` is short for `helm-releases`.
 
 Every view is a buffer named `kube://[context/{context}/][namespaces/{namespace}/]{kind}[/{name}[/{subresource}]][?{params}]`, so you can also open them directly:
 
@@ -32,6 +33,7 @@ Every view is a buffer named `kube://[context/{context}/][namespaces/{namespace}
 * `:e kube://deployments`: Deployments in all namespaces, in the current context.
 * `:e kube://namespaces/staging/deployments`: Deployments in the `staging` namespace, or `:e kube://ns/staging/deployments` for short.
 * `:e kube://context/production/pods`: Pods in the `production` context.
+* `:e kube://ns/staging/helm`: Helm releases in the `staging` namespace.
 
 A buffer opened without `context/{context}/` is bound to the context that was current when it was opened. Reloading, editing and deleting from it keep operating on that cluster even after you switch to another context.
 
@@ -45,6 +47,7 @@ Kube buffers behave like file buffers: every jump is an `:edit` in the current w
 * **Logs**: show / follow logs, of all containers, of the previous instance, since a duration; limited to the last 1000 lines by default. Following keeps the cursor at the end, like `tail -f`. Logs can be edited, e.g. `:%!jq`, `:%!jq .message -r` or `:%s/\\t/\t/g` to make them readable, `:w {file}` saves them.
 * **Events**: per namespace or for the resource under the cursor, warnings as diagnostics.
 * **Secrets**: view and edit decoded secret data.
+* **Helm**: list releases of all statuses, failed ones as diagnostics; `<CR>` shows the manifest, `gd` the values, `K` the status; `gra` shows all values, notes and the history, rolls back to the previous revision or to one of the history, and uninstalls. Delete lines and `:w` to uninstall releases. Values are read-only, as a release does not record where its chart comes from.
 * **Port forwarding**: forward ports of pods, deployments and services, `gx` opens them.
 * **exec**: open a shell in a container right in Neovim. Or in an ephemeral debug container (`kubectl debug`), for images without a shell.
 * **Watch**: `gw` reloads a list periodically, keeping the cursor on the same resource.

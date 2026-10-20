@@ -22,6 +22,17 @@ function M.check()
     vim.health.warn("Could not get the kubectl version: " .. vim.trim(version.stderr or ""))
   end
 
+  if vim.fn.executable("helm") == 1 then
+    local helm = vim.system({ "helm", "version", "--short" }, { text = true }):wait(10000)
+    if helm.code == 0 then
+      vim.health.ok("helm " .. vim.trim(helm.stdout or ""))
+    else
+      vim.health.warn("Could not get the helm version: " .. vim.trim(helm.stderr or ""))
+    end
+  else
+    vim.health.info("helm not found in $PATH, Helm releases (kube://helm-releases) are not available")
+  end
+
   local kubectl = require("kubectl")
   local context = kubectl.get_current_context()
   if not context then

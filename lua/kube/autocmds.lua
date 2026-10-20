@@ -10,8 +10,8 @@ M.augroup = augroup("kube_autocmds", { clear = true })
 
 ---The name of the buffer a name is an alias of, itself if none:
 ---without `context/<context>/` it is pinned to the current context, so the buffer keeps operating
----on the same cluster after the context is switched; `ns` is short for `namespaces`; no kind is
----the resource types, `api-resources`.
+---on the same cluster after the context is switched; `ns` is short for `namespaces`, `helm` for
+---`helm-releases`; no kind is the resource types, `api-resources`.
 ---@param buf_name string
 ---@return string|nil name
 ---@return string|nil err
@@ -35,6 +35,11 @@ function M.canonical_name(buf_name)
     context = string.format("context/%s/", vim.uri_encode(current, "rfc2396"))
   end
   rest = rest:gsub("^ns$", "namespaces"):gsub("^ns([/?])", "namespaces%1")
+  local namespace = rest:match("^namespaces/[^/?]+/") or ""
+  local kind = rest:sub(#namespace + 1)
+  if kind == "helm" or kind:match("^helm[/?]") then
+    rest = namespace .. "helm-releases" .. kind:sub(#"helm" + 1)
+  end
   if rest == "" then
     rest = "api-resources"
   end

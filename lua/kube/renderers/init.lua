@@ -11,6 +11,10 @@ local subresources = {
 ---@type Renderer
 local M = {
   load = function(buffer)
+    if buffer.resource_kind == "helm-releases" then
+      return require("kube.renderers.helm").load(buffer)
+    end
+
     if not buffer.resource_name then
       if buffer.resource_kind == "events" and (buffer.params or {})["for"] then
         return require("kube.renderers.related_events").load(buffer)

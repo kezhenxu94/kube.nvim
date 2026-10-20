@@ -36,6 +36,20 @@ assert(vim
   })
   :wait(30000).code == 0)
 
+local CHART = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h") .. "/chart"
+
+---Run helm in the test namespace.
+---@param args string[]
+---@return vim.SystemCompleted
+local function h(args)
+  return vim.system(vim.list_extend({ "helm", "--kube-context", CONTEXT, "-n", NS }, args), { text = true }):wait(60000)
+end
+
+-- A release with two revisions
+assert(h({ "uninstall", "greeter", "--ignore-not-found", "--wait" }).code == 0)
+assert(h({ "install", "greeter", CHART }).code == 0)
+assert(h({ "upgrade", "greeter", CHART, "--set", "greeting=hi" }).code == 0)
+
 ---@param kind string
 ---@return string
 local function list(kind)
@@ -265,5 +279,44 @@ describe("kind cluster", function()
     t.wait_for(function()
       return k({ "get", "pod", pod }).code ~= 0
     end, "pod " .. pod .. " to be deleted", TIMEOUT * 2)
+  end)
+end)
+
+describe("helm releases", function()
+  local RELEASE = list("helm-releases") .. "/greeter"
+
+  it("lists releases, <CR> shows the manifest, gd the values", function()
+    open(list("helm-releases"))
+    wait_line("^kube%-e2e%s+greeter%s+2%s+deployed%s+kube%-e2e%-0%.1%.0%s+1%.0")
+    t.press_on("greeter", "<CR>")
+    wait_line('greeting: "hi"')
+    t.eq(RELEASE .. "/manifest", vim.api.nvim_buf_get_name(0))
+
+    open(list("helm-releases"))
+    t.press_on("greeter", "gd")
+    wait_line("^greeting: hi$")
+  end)
+
+  it("rolls back to a revision of the history", function()
+    open(RELEASE .. "/history")
+    wait_line("^2%s.-deployed")
+    answer_yes()
+    t.press_on("Install complete", "")
+    code_action("Rollback to revision 1")
+    t.wait_for(function()
+      local history = vim.json.decode(h({ "history", "greeter", "-o", "json" }).stdout)
+      return history[3] and history[3].description == "Rollback to 1"
+    end, "revision 3 rolling back to 1", TIMEOUT)
+  end)
+
+  it("uninstalls a release by deleting its line", function()
+    open(list("helm-releases"))
+    wait_line("greeter")
+    answer_yes()
+    t.press_on("greeter", "dd")
+    vim.cmd.write()
+    t.wait_for(function()
+      return h({ "status", "greeter" }).code ~= 0
+    end, "release greeter to be uninstalled", TIMEOUT)
   end)
 end)

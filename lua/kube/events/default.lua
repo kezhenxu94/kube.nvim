@@ -64,7 +64,12 @@ local function apply_changes(buffer, edits, resources_to_delete, force, callback
   local kubectl = require("kubectl")
   local changes = vim.list_extend({}, edits)
   for _, resource in ipairs(resources_to_delete) do
-    table.insert(changes, {
+    table.insert(changes, resource.kind == "HelmRelease" and {
+      title = string.format("Uninstall helm release %s/%s", resource.namespace, resource.name),
+      run = function(on_done, on_error)
+        require("helm").uninstall(buffer.context, resource.name, resource.namespace, on_done, on_error)
+      end,
+    } or {
       title = "Delete " .. describe_target(resource),
       run = function(on_done, on_error)
         kubectl.delete(
@@ -139,8 +144,9 @@ local function handle_buffer_save(buf_nr, callback, opts)
   table.sort(mark_ids)
   for _, mark_id in ipairs(mark_ids) do
     local marked_line = buffer.mark_mappings[mark_id]
-    -- Rows that are not resources, like the containers of a pod, cannot be deleted
-    if deleted(buffer, mark_id) and marked_line.item and marked_line.item.metadata then
+    -- Rows that are not resources, like the containers of a pod, cannot be deleted, Helm releases are uninstalled
+    local item = marked_line.item
+    if deleted(buffer, mark_id) and item and (item.metadata or item.kind == "HelmRelease") then
       log.debug("mark to delete", mark_id, marked_line)
       table.insert(resources_to_delete, marked_line.item)
     end

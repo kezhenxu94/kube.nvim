@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kube-e2e
+description: The chart of the end-to-end tests of the Helm releases
+version: 0.1.0
+appVersion: "1.0"
