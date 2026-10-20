@@ -72,14 +72,34 @@ local handlers = {
     local kbuf = kube_buffer(params.textDocument.uri)
     local line = params.position.line
     local resource = kbuf and operations.items_in_rows(kbuf, line, line)[1]
-    if not resource or not resource.metadata or not resource.kind then
+    local title, run
+    if resource and resource.kind == "APIResource" then
+      -- A resource type: its documentation
+      title = "Explaining " .. resource.name
+      run = function(callback, on_error)
+        kubectl.explain(kbuf.context, resource.name, callback, on_error)
+      end
+    elseif resource and resource.metadata and resource.kind then
+      local resource_type = utils.resource_type(resource)
+      title = string.format("Describing %s/%s", resource_type, resource.metadata.name)
+      run = function(callback, on_error)
+        kubectl.describe(
+          kbuf.context,
+          resource_type,
+          resource.metadata.name,
+          resource.metadata.namespace,
+          callback,
+          on_error
+        )
+      end
+    else
       reply(nil, nil)
       return
     end
-    local resource_type = utils.resource_type(resource)
+
     -- The hover is only shown once kubectl answers: report the progress meanwhile
-    local done = progress(dispatchers, string.format("Describing %s/%s", resource_type, resource.metadata.name))
-    kubectl.describe(kbuf.context, resource_type, resource.metadata.name, resource.metadata.namespace, function(result)
+    local done = progress(dispatchers, title)
+    run(function(result)
       done(not result and "Failed" or nil)
       reply(nil, result and { contents = { kind = "plaintext", value = vim.trim(result) } } or nil)
     end, function(err)

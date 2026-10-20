@@ -1,0 +1,7 @@
+NAME                SHORTNAMES   APIVERSION                       NAMESPACED   KIND
+bindings                         v1                               true         Binding
+namespaces          ns           v1                               false        Namespace
+nodes               no           v1                               false        Node
+pods                po           v1                               true         Pod
+deployments         deploy       apps/v1                          true         Deployment
+gateways            gw           networking.istio.io/v1           true         Gateway

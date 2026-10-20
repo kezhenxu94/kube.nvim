@@ -125,6 +125,92 @@ local function container_operations(kbuf, container)
   }
 end
 
+---Operations on a resource type of the `api-resources` buffer.
+---@param kbuf KubeBuffer
+---@param type table
+---@return KubeOperation[]
+local function api_resource_operations(kbuf, type)
+  local namespace = type.namespaced and kbuf.namespace or nil
+  local operations = {
+    {
+      title = "List",
+      run = function()
+        vim.cmd.edit(vim.fn.fnameescape(require("kube.navigation").api_resource_target(kbuf, type)))
+      end,
+    },
+  }
+  if namespace and namespace ~= "all" then
+    table.insert(operations, {
+      title = "List in all namespaces",
+      run = function()
+        utils.open({ context = kbuf.context, kind = type.name })
+      end,
+    })
+  end
+  table.insert(operations, {
+    title = "Show events",
+    run = function()
+      utils.open({
+        context = kbuf.context,
+        namespace = namespace,
+        kind = "events",
+        params = { ["field-selector"] = "involvedObject.kind=" .. type.object_kind },
+      })
+    end,
+  })
+  return operations
+end
+
+---Operations on port forward rows, of a resource or of `kube://portforwards`.
+---@param kbuf KubeBuffer
+---@param forwards table[]
+---@return KubeOperation[]
+local function portforward_operations(kbuf, forwards)
+  local operations = {}
+  if #forwards == 1 then
+    local forward = forwards[1]
+    local portforward = forward.portforward
+    table.insert(operations, {
+      title = "Open in browser",
+      run = function()
+        vim.ui.open(string.format("http://localhost:%d", forward.local_port))
+      end,
+    })
+    table.insert(operations, {
+      title = string.format("Go to %s/%s", portforward.resource_type, portforward.name),
+      run = function()
+        utils.open({
+          context = portforward.context,
+          namespace = portforward.namespace,
+          kind = portforward.resource_type,
+          name = portforward.name,
+          params = { output = "yaml" },
+        })
+      end,
+    })
+  end
+
+  local ports = vim.tbl_map(function(forward)
+    return tostring(forward.local_port)
+  end, forwards)
+  table.insert(operations, {
+    title = #forwards == 1 and "Stop" or string.format("Stop %d port forwards", #forwards),
+    run = function()
+      confirm(string.format("Stop the port forwards of local ports %s?", table.concat(ports, ", ")), function(yes)
+        if not yes then
+          return
+        end
+        for _, forward in ipairs(forwards) do
+          kubectl.kill(forward.portforward.job)
+          _G.portforwards[forward.id][forward.local_port] = nil
+        end
+        kbuf:load()
+      end)
+    end,
+  })
+  return operations
+end
+
 ---@param kbuf KubeBuffer
 ---@param resource table
 ---@return KubeOperation[]
@@ -360,6 +446,12 @@ function M.for_items(kbuf, items)
 
   if kbuf.subresource_kind == "containers" then
     return #items == 1 and container_operations(kbuf, items[1]) or {}
+  end
+  if kbuf.resource_kind == "api-resources" then
+    return #items == 1 and api_resource_operations(kbuf, items[1]) or {}
+  end
+  if kbuf.resource_kind == "portforwards" or kbuf.subresource_kind == "portforward" then
+    return portforward_operations(kbuf, items)
   end
 
   local resources = vim.tbl_filter(function(item)

@@ -4,7 +4,7 @@ local utils = require("kube.utils")
 local M = {}
 
 ---The buffer one level up: subresource / resource -> list in its namespace
-----> list in all namespaces -> namespaces.
+----> list in all namespaces -> namespaces -> api-resources.
 ---@param kbuf KubeBuffer
 ---@return string|nil
 function M.parent_name(kbuf)
@@ -14,10 +14,25 @@ function M.parent_name(kbuf)
   if kbuf.namespace ~= "all" then
     return utils.buf_name({ context = kbuf.context, kind = kbuf.resource_kind, params = kbuf.params })
   end
-  if kbuf.resource_kind ~= "namespaces" then
+  if kbuf.resource_kind == "namespaces" then
+    return utils.buf_name({ context = kbuf.context, kind = "api-resources" })
+  end
+  if kbuf.resource_kind ~= "api-resources" then
     return utils.buf_name({ context = kbuf.context, kind = "namespaces" })
   end
   return nil
+end
+
+---The list of the resource type of an `api-resources` row, in the buffer's namespace if namespaced.
+---@param kbuf KubeBuffer
+---@param item table
+---@return string
+function M.api_resource_target(kbuf, item)
+  return utils.buf_name({
+    context = kbuf.context,
+    namespace = item.namespaced and kbuf.namespace or nil,
+    kind = item.name,
+  })
 end
 
 ---The cell at `pos`, or just the row's item between cells.
@@ -47,13 +62,16 @@ end
 
 ---The buffer the cell at `pos` refers to, like a tag:
 ---NAMESPACE -> the same list in that namespace, NODE -> the node, an event's OBJECT -> that object,
----a namespace row -> its pods, anything else -> the resource's definition (YAML).
+---a namespace row -> its pods, a resource type -> its list, anything else -> the resource's definition (YAML).
 ---@param kbuf KubeBuffer
 ---@param pos integer[] (0,0)-indexed position
 ---@return string|nil
 function M.tag_target(kbuf, pos)
   local cell = cell_at(kbuf, pos)
   local item = cell and cell.item
+  if item and item.kind == "APIResource" then
+    return M.api_resource_target(kbuf, item)
+  end
   if not item or not item.metadata then
     return nil
   end

@@ -10,7 +10,8 @@ M.augroup = augroup("kube_autocmds", { clear = true })
 
 ---The name of the buffer a name is an alias of, itself if none:
 ---without `context/<context>/` it is pinned to the current context, so the buffer keeps operating
----on the same cluster after the context is switched; `ns` is short for `namespaces`.
+---on the same cluster after the context is switched; `ns` is short for `namespaces`; no kind is
+---the resource types, `api-resources`.
 ---@param buf_name string
 ---@return string|nil name
 ---@return string|nil err
@@ -23,6 +24,9 @@ function M.canonical_name(buf_name)
   local context = rest:match("^context/[^/?]*/?")
   if context then
     rest = rest:sub(#context + 1)
+    if not vim.endswith(context, "/") then
+      context = context .. "/"
+    end
   else
     local current = require("kubectl").get_current_context()
     if not current then
@@ -31,6 +35,9 @@ function M.canonical_name(buf_name)
     context = string.format("context/%s/", vim.uri_encode(current, "rfc2396"))
   end
   rest = rest:gsub("^ns$", "namespaces"):gsub("^ns([/?])", "namespaces%1")
+  if rest == "" then
+    rest = "api-resources"
+  end
   return "kube://" .. context .. rest
 end
 

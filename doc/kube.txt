@@ -59,6 +59,7 @@ Every view is a buffer named: >
     kube://[context/{context}/][namespaces/{ns}/]{kind}[/{name}[/{sub}]][?{params}]
 <
 Examples: >
+    :e kube://                               " the resource types, see below
     :e kube://deployments                    " all namespaces
     :e kube://namespaces/staging/deployments " the staging namespace
     :e kube://context/production/pods        " the production context
@@ -68,7 +69,10 @@ editing it edits the buffer with the context in its name, so the buffer keeps
 operating on that cluster after switching contexts with |:Kube| context. The
 alias buffer is wiped, it is never the |alternate-file| nor in the |jumplist|.
 Likewise `ns` is short for `namespaces`: `:e kube://ns/staging/pods` edits
-`kube://context/{context}/namespaces/staging/pods`.
+`kube://context/{context}/namespaces/staging/pods`, and a name without {kind}
+edits `api-resources`: the resource types of the cluster (`kubectl
+api-resources`). <CR> or |CTRL-]| on one lists it, in {ns} for namespaced
+types of `kube://ns/{ns}/api-resources`.
 Contexts with `/` or `:` are percent-encoded.
 
 Every jump (<CR>, |gd|, |CTRL-]|, `-`, `gl`, ...) is an |:edit| of the target
@@ -114,9 +118,10 @@ built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
     <CR>    Drill down: a pod's containers, a deployment's pods, a secret's
             decoded data, ...
     gd      Go to what the cell under the cursor refers to, see |kube-jump|
-    K       Describe the resource under the cursor (LSP hover)
+    K       Describe the resource under the cursor, explain a resource type
+            (`kubectl explain`) in `kube://` (LSP hover)
     -       Parent: resource -> list in its namespace -> all namespaces ->
-            namespaces
+            namespaces -> resource types
     R       Reload, the cursor stays on the same resource
     gw      Toggle watching: reload the list every `refresh_interval`
     gl gL   Show / follow logs, <C-c> stops following
@@ -132,6 +137,7 @@ built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
     NODE            the node
     OBJECT (events) the involved object
     a namespace row the pods in it
+    a resource type the list of that type
     anything else   the resource's YAML
 |CTRL-T| jumps back and |CTRL-W_]| opens the jump in a split, as with tags.
 
@@ -143,7 +149,7 @@ resource, |CTRL-W_d| shows why, |gx| opens a port forward URL.
 
 kube.nvim attaches an in-process language server named "kube" to its buffers,
 so LSP keymaps and pickers work on them:
-    hover               describe (|K|)
+    hover               describe, explain a resource type (|K|)
     definition          |kube-jump|
     document symbols    the resources of the list (|gO|)
     code actions        every operation on the resource under the cursor
@@ -154,6 +160,9 @@ so LSP keymaps and pickers work on them:
     Exec, Debug (ephemeral container), Forward port, Show port forwards, Set
     image, Scale…, Restart, Undo rollout, Rollout history, Trigger now (cron
     jobs), Decode secret, Cordon, Uncordon, Drain, Delete
+
+    Resource types (`kube://`): List, List in all namespaces, Show events.
+    Port forwards: Open in browser, Go to the resource, Stop.
 
 Operations changing the cluster ask for confirmation, naming the context.
 

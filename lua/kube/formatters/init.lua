@@ -57,6 +57,10 @@ local formatters = {
     require("kube.formatters.events"),
   },
   {
+    { "api-resources" },
+    require("kube.formatters.api_resources"),
+  },
+  {
     { "portforwards" },
     require("kube.formatters.portforwards"),
   },

@@ -92,9 +92,13 @@ local M = {
       require("kube.help").show(buf_nr)
     end)
 
-    map(config.keymaps.describe, "describe the resource under the cursor (LSP hover)", function()
-      vim.lsp.buf.hover()
-    end)
+    map(
+      config.keymaps.describe,
+      "describe the resource under the cursor, explain a resource type (LSP hover)",
+      function()
+        vim.lsp.buf.hover()
+      end
+    )
 
     map(config.keymaps.watch, "toggle reloading the list periodically", function()
       require("kube.refresh").toggle(kbuf)

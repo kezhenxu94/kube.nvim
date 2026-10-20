@@ -20,7 +20,8 @@ function M.lines(buf_nr)
     "Built-in keys that also work",
     "  <C-]>    jump to what the cell under the cursor refers to: NAMESPACE",
     "           filters the list, NODE opens the node, an event's OBJECT the",
-    "           object, a namespace row lists its pods, else the YAML",
+    "           object, a namespace row lists its pods, a resource type lists",
+    "           it, else the YAML",
     "  <C-t>    jump back, <C-w>] opens the jump in a split",
     "  gra      all operations on the resource, or on a visual selection:",
     "           scale, restart, undo, history, events, logs, debug, trigger,",
@@ -45,6 +46,7 @@ function M.lines(buf_nr)
     "  kube://[context/{context}/][namespaces/{ns}/]{kind}[/{name}[/{subresource}]]",
     "  Without context/{context}/ the current context is used and the buffer",
     "  stays bound to it, e.g. :e kube://deployments",
+    "  :e kube:// lists the resource types",
     "",
     "More in :help kube.nvim",
   })

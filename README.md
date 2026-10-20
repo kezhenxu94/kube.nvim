@@ -28,6 +28,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 Every view is a buffer named `kube://[context/{context}/][namespaces/{namespace}/]{kind}[/{name}[/{subresource}]][?{params}]`, so you can also open them directly:
 
+* `:e kube://`: The resource types of the cluster, `<CR>` on one lists it.
 * `:e kube://deployments`: Deployments in all namespaces, in the current context.
 * `:e kube://namespaces/staging/deployments`: Deployments in the `staging` namespace, or `:e kube://ns/staging/deployments` for short.
 * `:e kube://context/production/pods`: Pods in the `production` context.
@@ -57,8 +58,8 @@ Keymaps follow Neovim's conventions: LSP's `gd` / `K` / `<C-]>`, and the built-i
 
 * `<CR>`: Drill down into the resource under the cursor (a pod's containers, a deployment's pods, a secret's data, ...).
 * `gd`: Go to what the cell under the cursor refers to, the YAML of the resource for most cells.
-* `K`: Describe the resource under the cursor.
-* `-`: Go to the parent buffer: resource → list in its namespace → list in all namespaces → namespaces.
+* `K`: Describe the resource under the cursor, or explain the resource type in `kube://`.
+* `-`: Go to the parent buffer: resource → list in its namespace → list in all namespaces → namespaces → resource types.
 * `R`: Reload the buffer, the cursor stays on the same resource.
 * `gw`: Toggle reloading the list every `refresh_interval`.
 * `gl` / `gL`: Show / follow logs, `<C-c>` stops following.
@@ -69,7 +70,7 @@ Keymaps follow Neovim's conventions: LSP's `gd` / `K` / `<C-]>`, and the built-i
 
 Built-in keys that work in kube buffers:
 
-* `<C-]>`: Jump to what the cell under the cursor refers to: a NAMESPACE filters the list to that namespace, a NODE opens the node, an event's OBJECT the object, a namespace row lists its pods, anything else goes to the resource's YAML. `<C-t>` jumps back and `<C-w>]` opens the jump in a split, as with tags.
+* `<C-]>`: Jump to what the cell under the cursor refers to: a NAMESPACE filters the list to that namespace, a NODE opens the node, an event's OBJECT the object, a namespace row lists its pods, a resource type lists it, anything else goes to the resource's YAML. `<C-t>` jumps back and `<C-w>]` opens the jump in a split, as with tags.
 * `gra`: All operations on the resource under the cursor, or on the resources of a visual selection.
 * `]d` / `[d`: Next / previous unhealthy resource, `<C-w>d` shows why.
 * `gx`: Open the port forward URL under the cursor.

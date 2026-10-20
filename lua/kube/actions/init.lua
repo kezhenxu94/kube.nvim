@@ -24,9 +24,10 @@ local actions = {
   replicaset = require("kube.actions.replicaset"),
   service = require("kube.actions.service"),
   secret = require("kube.actions.secret"),
+  apiresource = require("kube.actions.apiresource"),
 }
 
-local non_object_rows = { container = true, containers = true, portforward = true }
+local non_object_rows = { container = true, containers = true, portforward = true, apiresource = true }
 
 ---@type table<string, Actions>
 local M = {}

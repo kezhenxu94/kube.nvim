@@ -494,6 +494,7 @@ end)
 describe("navigation", function()
   before_each(function()
     t.respond("*get namespaces -o json*", { fixture = "namespaces.json" })
+    t.respond("*api-resources*", { fixture = "api-resources.txt" })
     t.respond("*get pod -o json --all-namespaces*", { fixture = "pods.json" })
     t.respond("*get pod -o json -n ns1*", { fixture = "pods.json" })
     t.respond("*get deployment.apps -o json -n ns1*", { fixture = "deployments.json" })
@@ -509,15 +510,58 @@ describe("navigation", function()
       "kube://context/ctx-a/namespaces/ns1/pod",
       "kube://context/ctx-a/pod",
       "kube://context/ctx-a/namespaces",
+      "kube://context/ctx-a/api-resources",
     }) do
       vim.api.nvim_feedkeys("-", "mx", false)
       wait_buf_name(parent)
       t.wait_loaded()
     end
-    t.ok(t.lines()[1]:find("ns1", 1, true), "namespaces are listed")
 
     vim.api.nvim_feedkeys("-", "mx", false)
-    t.eq("kube://context/ctx-a/namespaces", buf_name(), "namespaces has no parent")
+    t.eq("kube://context/ctx-a/api-resources", buf_name(), "the resource types have no parent")
+  end)
+
+  it("kube:// lists the resource types, which open their list", function()
+    open("kube://")
+    t.eq("kube://context/ctx-a/api-resources", buf_name())
+    t.eq("bindings                 v1                      true        Binding   ", t.lines()[1], "empty SHORTNAMES")
+    t.eq("deployments  deploy      apps/v1                 true        Deployment", t.lines()[5])
+    t.press_on("deployments", "<CR>")
+    wait_buf_name("kube://context/ctx-a/deployments.apps")
+  end)
+
+  it("opens namespaced resource types in the namespace of the list", function()
+    open("kube://ns/ns1/api-resources")
+    t.press_on("deployments", "<C-]>")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployments.apps")
+    vim.cmd("normal! \20")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/api-resources")
+    t.press_on("nodes", "gd")
+    wait_buf_name("kube://context/ctx-a/nodes")
+  end)
+
+  it("K explains the resource type in a hover", function()
+    t.respond("*explain*", { stdout = "GROUP:      apps\nKIND:       Deployment" })
+    open("kube://")
+    t.press_on("deployments", "K")
+    local float = wait_float("KIND:       Deployment")
+    t.eq({ "--context ctx-a explain deployments.apps" }, t.calls_matching("explain"))
+    vim.api.nvim_win_close(float, true)
+  end)
+
+  it("lists the resource types of the API groups that answer", function()
+    local messages = t.capture_notify()
+    local fixture = vim.fn.fnamemodify("tests/fixtures/api-resources.txt", ":p")
+    t.respond("*api-resources*", {
+      script = string.format(
+        "cat '%s'; echo 'error: unable to retrieve the complete list of server APIs: metrics.k8s.io/v1beta1' >&2; exit 1",
+        fixture
+      ),
+    })
+    open("kube://")
+    t.ok(table.concat(t.lines(), "\n"):find("deployments", 1, true))
+    t.ok(t.status():find("metrics.k8s.io", 1, true), t.status())
+    t.eq(vim.log.levels.ERROR, messages[#messages].level)
   end)
 
   it("- from a definition lists the kind with its formatter", function()

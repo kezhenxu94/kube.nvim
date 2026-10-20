@@ -15,6 +15,9 @@ local M = {
       if buffer.resource_kind == "events" and (buffer.params or {})["for"] then
         return require("kube.renderers.related_events").load(buffer)
       end
+      if buffer.resource_kind == "api-resources" then
+        return require("kube.renderers.api_resources").load(buffer)
+      end
       if buffer.resource_kind == "portforwards" then
         return require("kube.renderers.portforwards").load(buffer)
       end

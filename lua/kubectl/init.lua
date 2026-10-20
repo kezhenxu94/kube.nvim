@@ -72,7 +72,7 @@ end
 ---Run kubectl asynchronously, callbacks are invoked on the main loop.
 ---@param context string|nil
 ---@param args string[] The kubectl arguments
----@param callback fun(data: string|nil, code: integer)|nil Called with stdout on success, nil on failure
+---@param callback fun(data: string|nil, code: integer, stderr: string)|nil Called with stdout on success, nil on failure
 ---@param on_error fun(data: string)|nil Called with stderr on failure
 ---@param opts KubectlOpts|nil
 ---@return vim.SystemObj|nil
@@ -96,7 +96,7 @@ local function kubectl(context, args, callback, on_error, opts)
         on_error(vim.trim(out.stderr or ""))
       end
       if callback then
-        callback(success and out.stdout or nil, out.code)
+        callback(success and out.stdout or nil, out.code, out.stderr or "")
       end
     end)
   )
@@ -254,6 +254,15 @@ function M.forward_port(context, resource_kind, name, namespace, port, local_por
   return kubectl(context, vim.list_extend(args, namespace_args(namespace)), callback, on_error, { stream = true })
 end
 
+---The documentation of a resource type.
+---@param context string|nil The context to run against
+---@param resource_type string e.g. `deployments.apps`
+---@param callback fun(data: string|nil)
+---@param on_error fun(data: string)|nil
+function M.explain(context, resource_type, callback, on_error)
+  return kubectl(context, { "explain", resource_type }, callback, on_error)
+end
+
 ---@param context string|nil The context to run against
 ---@param resource_kind string The kind of resource
 ---@param name string The name of the resource
@@ -299,6 +308,14 @@ function M.use_context(name, callback, on_error)
 end
 
 ---@type table<string, string[]>
+---The `kubectl api-resources` table, it has no JSON output.
+---@param context string|nil The context to run against
+---@param callback fun(data: string|nil, code: integer, stderr: string) Partial with code 1 when API groups fail
+---@param on_error fun(data: string)|nil
+function M.api_resources(context, callback, on_error)
+  return kubectl(context, { "api-resources" }, callback, on_error, { ok_codes = { 0, 1 } })
+end
+
 local api_resources_cache = {}
 
 ---@return string[] The list of API resources
