@@ -4,6 +4,8 @@ Neovim Kubernetes plugin, manage your Kubernetes resources like a buffer!
 
 [![kube.nvim demo](demo/kube-nvim.gif)](https://asciinema.org/a/ycGEDdCaHY7hDeDj)
 
+For Docker, see [docker.nvim](https://github.com/kezhenxu94/docker.nvim), the same buffers for containers, images, volumes, networks and compose projects.
+
 ## Installation
 
 Requirements: Neovim >= 0.11 and `kubectl` in `$PATH`, `helm` too for Helm releases. No other plugin dependencies.
