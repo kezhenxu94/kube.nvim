@@ -1,6 +1,8 @@
 ---In-process language server for kube buffers, so that LSP keymaps and pickers work on them:
 ---hover = describe, definition = what the cell refers to (see `kube.navigation`),
----document symbols = the resources, code actions = `kube.operations` (on a range: bulk operations).
+---document symbols = the resources, code actions = `kube.operations` (on a range: bulk operations),
+---selection ranges = cell -> row -> list, for the default |an| / |in|.
+local constants = require("kube.constants")
 local kubectl = require("kubectl")
 local navigation = require("kube.navigation")
 local operations = require("kube.operations")
@@ -28,6 +30,42 @@ local function line_range(line)
   return { start = { line = line, character = 0 }, ["end"] = { line = line, character = 0 } }
 end
 
+---@param start_line integer
+---@param start_col integer
+---@param end_line integer
+---@param end_col integer
+---@return lsp.Range
+local function range(start_line, start_col, end_line, end_col)
+  return { start = { line = start_line, character = start_col }, ["end"] = { line = end_line, character = end_col } }
+end
+
+---The cell at `pos`, from the start of its text to the end, as byte columns.
+---@param kbuf KubeBuffer
+---@param pos integer[] (0,0)-indexed position
+---@return lsp.Range|nil
+local function cell_range(kbuf, pos)
+  local marks = vim.api.nvim_buf_get_extmarks(
+    kbuf.buf_nr,
+    constants.KUBE_COLUMN_NAMESPACE,
+    pos,
+    pos,
+    { overlap = true, details = true }
+  )
+  for _, mark in ipairs(marks) do
+    local row, col, details = mark[2], mark[3], mark[4]
+    -- Overlapping also returns the cell ending right before `pos`
+    if kbuf.mark_columns[mark[1]] and row == details.end_row and col <= pos[2] and pos[2] < details.end_col then
+      local text = vim.api.nvim_buf_get_text(kbuf.buf_nr, row, col, row, details.end_col, {})[1]
+      -- Cells are padded to the width of their column
+      local first, last = text:find("%S"), text:find("%S%s*$")
+      if first then
+        return range(row, col + first - 1, row, col + last)
+      end
+    end
+  end
+  return nil
+end
+
 local progress_count = 0
 
 ---Report work done progress (`$/progress`) to the client, created by the server.
@@ -52,12 +90,15 @@ local handlers = {
   initialize = function(_, reply)
     reply(nil, {
       capabilities = {
+        -- Columns are those of the extmarks, in bytes
+        positionEncoding = "utf-8",
         -- Buffers are rendered by kube.nvim, the server never needs their text
         textDocumentSync = 0,
         hoverProvider = true,
         definitionProvider = true,
         documentSymbolProvider = true,
         codeActionProvider = true,
+        selectionRangeProvider = true,
         executeCommandProvider = { commands = { EXECUTE_OPERATION } },
       },
       serverInfo = { name = "kube.nvim" },
@@ -136,6 +177,25 @@ local handlers = {
       end
     end
     reply(nil, symbols)
+  end,
+
+  ["textDocument/selectionRange"] = function(params, reply)
+    local kbuf = kube_buffer(params.textDocument.uri)
+    if not kbuf then
+      reply(nil, {})
+      return
+    end
+    local lines = vim.api.nvim_buf_get_lines(kbuf.buf_nr, 0, -1, false)
+    local list = { range = range(0, 0, #lines - 1, #lines[#lines]) }
+    reply(
+      nil,
+      vim.tbl_map(function(position)
+        local line = position.line
+        local row = { range = range(line, 0, line, #(lines[line + 1] or "")), parent = list }
+        local cell = cell_range(kbuf, { line, position.character })
+        return cell and { range = cell, parent = row } or row
+      end, params.positions)
+    )
   end,
 
   ["textDocument/codeAction"] = function(params, reply)

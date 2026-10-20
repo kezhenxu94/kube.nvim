@@ -152,6 +152,8 @@ so LSP keymaps and pickers work on them:
     hover               describe, explain a resource type (|K|)
     definition          |kube-jump|
     document symbols    the resources of the list (|gO|)
+    selection ranges    the cell, the row, the list: |an| / |in| (Neovim 0.12+)
+                        select them, e.g. `can` changes an editable cell
     code actions        every operation on the resource under the cursor
                         (|gra|), or on all resources of a visual selection:
 

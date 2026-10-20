@@ -698,6 +698,36 @@ describe("language server", function()
     local result = vim.lsp.buf_request_sync(0, "textDocument/definition", params, 2000)
     t.eq(PODS, result[next(result)].result.uri)
   end)
+
+  it("selection ranges are the cell, the row, then the list", function()
+    open(PODS)
+    wait_lsp()
+    t.press_on("web-1", "")
+    local line = vim.api.nvim_get_current_line()
+    local first = line:find("web-1", 1, true) - 1
+    local result = vim.lsp.buf_request_sync(0, "textDocument/selectionRange", {
+      textDocument = vim.lsp.util.make_text_document_params(0),
+      positions = { { line = 0, character = first + 2 }, { line = 0, character = first + 5 } },
+    }, 2000)
+    local cell, between = unpack(result[next(result)].result)
+    t.eq({ start = { line = 0, character = first }, ["end"] = { line = 0, character = first + 5 } }, cell.range)
+    t.eq({ start = { line = 0, character = 0 }, ["end"] = { line = 0, character = #line } }, cell.parent.range)
+    t.eq(1, cell.parent.parent.range["end"].line)
+    t.eq(cell.parent.range, between.range, "the row between cells")
+  end)
+
+  if vim.fn.has("nvim-0.12") == 1 then
+    it("an / in select the cell, the row and back", function()
+      open(PODS)
+      wait_lsp()
+      t.press_on("web-1", "lvany")
+      t.eq("web-1", vim.fn.getreg('"'))
+      t.press_on("web-1", "lvanany")
+      t.eq(vim.api.nvim_get_current_line(), vim.fn.getreg('"'))
+      t.press_on("web-1", "lvananiny")
+      t.eq("web-1", vim.fn.getreg('"'))
+    end)
+  end
 end)
 
 ---@param ns integer
@@ -879,7 +909,7 @@ describe("editing cells", function()
     t.respond("*get pod -o json web-1 *", { fixture = "pod-web-1.json" })
     t.respond("*set image*", { stdout = "pod/web-1 image updated" })
     open("kube://namespaces/ns1/pod/web-1/containers")
-    edit_cell("app", "IMAGE", "cWweb:2<Esc>")
+    edit_cell("app", "IMAGE", vim.fn.has("nvim-0.12") == 1 and "canweb:2<Esc>" or "cWweb:2<Esc>")
     vim.cmd("write!")
     wait_call("set image")
     t.eq({ "--context ctx-a set image pod/web-1 app=web:2 -n ns1" }, t.calls_matching("set image"))
