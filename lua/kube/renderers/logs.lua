@@ -40,7 +40,7 @@ local M = {
     end
 
     local job = kubectl.logs(self.context, resource_kind, resource_name, namespace, opts, function(result)
-      if not vim.api.nvim_buf_is_valid(self.buf_nr) then
+      if not vim.api.nvim_buf_is_loaded(self.buf_nr) then
         return
       end
 

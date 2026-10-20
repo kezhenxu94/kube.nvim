@@ -29,10 +29,12 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 Every view is a buffer named `kube://[context/{context}/][namespaces/{namespace}/]{kind}[/{name}[/{subresource}]][?{params}]`, so you can also open them directly:
 
 * `:e kube://deployments`: Deployments in all namespaces, in the current context.
-* `:e kube://namespaces/staging/deployments`: Deployments in the `staging` namespace.
+* `:e kube://namespaces/staging/deployments`: Deployments in the `staging` namespace, or `:e kube://ns/staging/deployments` for short.
 * `:e kube://context/production/pods`: Pods in the `production` context.
 
 A buffer opened without `context/{context}/` is bound to the context that was current when it was opened. Reloading, editing and deleting from it keep operating on that cluster even after you switch to another context.
+
+Kube buffers behave like file buffers: every jump is an `:edit` in the current window, so `<C-o>`, `<C-^>`, `<C-t>`, `'hidden'` and `:bd` work as usual. See `:help kube-buffers`.
 
 ## Features
 
@@ -64,7 +66,6 @@ Keymaps follow Neovim's conventions: LSP's `gd` / `K` / `<C-]>`, and the built-i
 * `gi`: Set image for the resource under the cursor.
 * `gs`: Open a shell (`kubectl exec`) in the resource under the cursor.
 * `g?`: Show the help.
-* `q`: Quit the buffer and wipe it out, if you only want to delete the buffer, use `:bd` or keymap like `<leader>bd`.
 
 Built-in keys that work in kube buffers:
 
@@ -94,7 +95,6 @@ require("kube").setup({
     forward_port = "gf",
     set_image = "gi",
     exec = "gs",
-    quit = "q",
     help = "g?",
   },
   -- How often watched lists (gw) reload, in milliseconds, false to disable watching

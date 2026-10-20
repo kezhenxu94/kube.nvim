@@ -38,20 +38,18 @@ _G.kube_buffers = {}
 local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer
 
----Create a new KubeBuffer instance
----@param buf_nr number The buffer number
----@return KubeBuffer
-function KubeBuffer:new(buf_nr)
-  buf_nr = buf_nr or vim.api.nvim_get_current_buf()
+---@class KubeBufNameParts
+---@field context string|nil
+---@field namespace string "all" for cluster-scoped / all namespaces
+---@field resource_kind string
+---@field resource_name string|nil
+---@field subresource_kind string|nil
+---@field params table<string, any>|nil
 
-  if _G.kube_buffers[buf_nr] then
-    -- Reloading the buffer (`:e`) detaches it from the language server
-    require("kube.lsp").attach(buf_nr)
-    return _G.kube_buffers[buf_nr]
-  end
-
-  -- See `require("kube.utils").buf_name` for the format
-  local buf_name = vim.api.nvim_buf_get_name(buf_nr)
+---Parse a buffer name, see `require("kube.utils").buf_name` for the format.
+---@param buf_name string
+---@return KubeBufNameParts
+function M.parse_name(buf_name)
   local path, query = buf_name:match("^kube://([^?]*)%??(.*)$")
   local segments = vim.split(path or "", "/", { plain = true, trimempty = true })
   log.debug("path", path, "query", query, "segments", segments)
@@ -87,16 +85,39 @@ function KubeBuffer:new(buf_nr)
     end
   end
 
-  local this = setmetatable({
-    buf_nr = buf_nr,
-    mark_mappings = {},
-    mark_columns = {},
+  return {
     context = context,
     namespace = namespace,
     resource_kind = resource_kind,
     resource_name = resource_name,
     subresource_kind = subresource_kind,
     params = params,
+  }
+end
+
+---Create a new KubeBuffer instance
+---@param buf_nr number The buffer number
+---@return KubeBuffer
+function KubeBuffer:new(buf_nr)
+  buf_nr = buf_nr or vim.api.nvim_get_current_buf()
+
+  if _G.kube_buffers[buf_nr] then
+    -- Reloading the buffer (`:e`) detaches it from the language server
+    require("kube.lsp").attach(buf_nr)
+    return _G.kube_buffers[buf_nr]
+  end
+
+  local parsed = M.parse_name(vim.api.nvim_buf_get_name(buf_nr))
+  local this = setmetatable({
+    buf_nr = buf_nr,
+    mark_mappings = {},
+    mark_columns = {},
+    context = parsed.context,
+    namespace = parsed.namespace,
+    resource_kind = parsed.resource_kind,
+    resource_name = parsed.resource_name,
+    subresource_kind = parsed.subresource_kind,
+    params = parsed.params,
     jobs = {},
   }, KubeBuffer)
   _G.kube_buffers[buf_nr] = this
@@ -121,8 +142,8 @@ end
 ---@param opts {silent: boolean|nil}|nil `silent` for background refreshes: no loading status, no error notification
 function KubeBuffer:load(opts)
   opts = opts or {}
-  -- Operations reload their buffer when done, it may have been closed meanwhile
-  if not vim.api.nvim_buf_is_valid(self.buf_nr) then
+  -- Operations reload their buffer when done, it may have been unloaded or deleted meanwhile
+  if not vim.api.nvim_buf_is_loaded(self.buf_nr) or _G.kube_buffers[self.buf_nr] ~= self then
     return
   end
   if self.loading_job and not self.loading_job:is_closing() then
@@ -141,11 +162,22 @@ function KubeBuffer:load(opts)
   self.loading_job = require("kube.renderers").load(self)
 end
 
+---Kill the jobs loading the buffer, their output has nowhere to go once it is unloaded.
+function KubeBuffer:stop_jobs()
+  local kubectl = require("kubectl")
+  kubectl.kill(self.loading_job)
+  self.loading_job = nil
+  for pid, job in pairs(self.jobs) do
+    kubectl.kill(job)
+    self.jobs[pid] = nil
+  end
+end
+
 ---Show a status after the first line, nil to clear it.
 ---@param text string|nil
 ---@param hl string|nil
 function KubeBuffer:set_status(text, hl)
-  if not vim.api.nvim_buf_is_valid(self.buf_nr) then
+  if not vim.api.nvim_buf_is_loaded(self.buf_nr) then
     return
   end
   vim.api.nvim_buf_clear_namespace(self.buf_nr, constants.KUBE_STATUS_NAMESPACE, 0, -1)

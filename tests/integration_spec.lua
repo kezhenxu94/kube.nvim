@@ -155,6 +155,36 @@ describe("context pinning", function()
     t.eq("kube://context/ctx-b/namespaces/ns1/pods", buf_name())
     t.ok(vim.api.nvim_get_current_buf() ~= pinned)
   end)
+
+  it("edits the pinned buffer for a name without context, leaving no alias behind", function()
+    open("kube://context/ctx-a/namespaces/ns1/deployments")
+    local deployments = vim.api.nvim_get_current_buf()
+    open("kube://namespaces/ns1/pods")
+    local pods = vim.api.nvim_get_current_buf()
+    t.eq("kube://context/ctx-a/namespaces/ns1/pods", buf_name())
+    t.eq(deployments, vim.fn.bufnr("#"))
+
+    vim.cmd.edit("kube://context/ctx-a/namespaces/ns1/deployments")
+    vim.cmd.edit("kube://namespaces/ns1/pods")
+    t.eq(pods, vim.api.nvim_get_current_buf(), "the existing pinned buffer")
+    t.eq(deployments, vim.fn.bufnr("#"))
+    vim.wait(20)
+    t.eq(-1, vim.fn.bufnr("^kube://namespaces/ns1/pods$"), "the alias is wiped")
+
+    vim.cmd("normal! \15")
+    t.eq(deployments, vim.api.nvim_get_current_buf(), "<C-o> goes back")
+  end)
+end)
+
+describe("ns", function()
+  it("opens the same buffer as namespaces", function()
+    open("kube://namespaces/ns1/pods")
+    local pods = vim.api.nvim_get_current_buf()
+    open("kube://ns/ns1/deployments")
+    t.eq("kube://context/ctx-a/namespaces/ns1/deployments", buf_name())
+    vim.cmd.edit("kube://context/ctx-a/ns/ns1/pods")
+    t.eq(pods, vim.api.nvim_get_current_buf())
+  end)
 end)
 
 describe("resource under the cursor", function()
@@ -369,6 +399,35 @@ describe("actions", function()
       { "kubectl", "--context", "ctx-a", "exec", "-it", "pod/web-1", "-n", "ns1", "-c", "app", "--" },
       vim.list_slice(cmd, 1, 11)
     )
+  end)
+
+  it("starts the shell from the buffer name, and reuses it", function()
+    t.respond("*exec*", { script = "sleep 30" })
+    local name = "kube://context/ctx-a/namespaces/ns1/pod/web-1/exec?container=app"
+    open("kube://namespaces/ns1/pods")
+    local pods = vim.api.nvim_get_current_buf()
+    vim.cmd.edit(vim.fn.fnameescape(name))
+    wait_call("exec")
+    t.eq(
+      { "--context ctx-a exec -it pod/web-1 -n ns1 -c app -- sh -c command -v bash >/dev/null && exec bash || exec sh" },
+      t.calls_matching("exec %-it")
+    )
+    t.eq("terminal", vim.bo.buftype)
+    t.eq(name, buf_name())
+    t.eq(pods, vim.fn.bufnr("#"))
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      t.ok(not vim.startswith(vim.api.nvim_buf_get_name(buf), "term://"), "no term:// buffer left")
+    end
+    local shell = vim.api.nvim_get_current_buf()
+
+    t.answer_prompts(function(items)
+      return items[1]
+    end)
+    open("kube://ns/ns1/pods")
+    t.press_on("web-1", "gs")
+    vim.cmd.stopinsert()
+    t.eq(shell, vim.api.nvim_get_current_buf(), "the running shell")
+    t.eq(1, #t.calls_matching("exec %-it"))
   end)
 
   it("prompts for the container to exec into", function()
@@ -587,14 +646,14 @@ describe("editing YAML", function()
     end, "reloaded buffer to be unmodified")
   end)
 
-  it("keeps the edits when apply fails, also on quit", function()
+  it("keeps the edits when apply fails", function()
     local messages = t.capture_notify()
     t.respond("*apply*", { stderr = "admission denied", code = 1 })
     open_edit()
     local buf = vim.api.nvim_get_current_buf()
     vim.api.nvim_buf_set_lines(0, 5, 6, false, { "  replicas: 3" })
 
-    vim.api.nvim_feedkeys("q", "mx", false)
+    vim.cmd.write()
     wait_call("apply")
     t.wait_for(function()
       return #messages > 0 and messages[#messages].msg:find("admission denied", 1, true)
@@ -720,6 +779,25 @@ describe("port forwarding", function()
 end)
 
 describe("cleanup", function()
+  it("stops the jobs of an unloaded buffer and loads it again when edited", function()
+    t.respond("*logs*", { script = "sleep 30" })
+    open("kube://namespaces/ns1/pods")
+    t.press_on("web-1", "gL")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?follow=true")
+    local buf = vim.api.nvim_get_current_buf()
+    local kbuf = _G.kube_buffers[buf]
+    local job = kbuf.loading_job
+
+    vim.cmd("bunload! " .. buf)
+    t.wait_for(function()
+      return job:is_closing()
+    end, "job to stop")
+    t.eq(kbuf, _G.kube_buffers[buf], "the state is kept")
+
+    vim.cmd.buffer(buf)
+    t.ok(kbuf.loading_job and kbuf.loading_job ~= job, "following again")
+  end)
+
   it("stops the buffer's jobs when it is wiped", function()
     t.respond("*logs*", { script = "sleep 30" })
     open("kube://namespaces/ns1/pods")

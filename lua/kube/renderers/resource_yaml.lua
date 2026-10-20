@@ -13,7 +13,7 @@ local M = {
       buffer.resource_name,
       buffer.namespace,
       function(yaml)
-        if not vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+        if not vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
           return
         end
         if yaml then

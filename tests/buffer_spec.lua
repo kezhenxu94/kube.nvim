@@ -79,3 +79,31 @@ describe("KubeBuffer name parsing", function()
     t.ok(KubeBuffer:new(buf) == KubeBuffer:new(buf))
   end)
 end)
+
+describe("canonical buffer names", function()
+  local canonical_name = require("kube.autocmds").canonical_name
+  t.respond("*config current-context*", { stdout = "ctx-a\n" })
+
+  it("pins names without a context to the current one", function()
+    t.eq("kube://context/ctx-a/pods", canonical_name("kube://pods"))
+    t.eq("kube://context/c/pods", canonical_name("kube://context/c/pods"))
+    t.eq("kube://portforwards", canonical_name("kube://portforwards"))
+  end)
+
+  it("expands ns to namespaces", function()
+    t.eq("kube://context/ctx-a/namespaces/prod/pods", canonical_name("kube://ns/prod/pods"))
+    t.eq(
+      "kube://context/c/namespaces/prod/pods?selector=app",
+      canonical_name("kube://context/c/ns/prod/pods?selector=app")
+    )
+    t.eq("kube://context/ctx-a/namespaces/prod", canonical_name("kube://ns/prod"))
+    t.eq("kube://context/ctx-a/namespaces", canonical_name("kube://ns"))
+    t.eq("kube://context/ctx-a/namespaces?selector=a", canonical_name("kube://ns?selector=a"))
+    t.eq("kube://context/ctx-a/nsx/a", canonical_name("kube://nsx/a"))
+    t.eq("kube://context/ctx-a/pods/ns", canonical_name("kube://pods/ns"))
+  end)
+
+  it("keeps malformed names for the buffer to reject", function()
+    t.eq("kube://context/c", canonical_name("kube://context/c"))
+  end)
+end)

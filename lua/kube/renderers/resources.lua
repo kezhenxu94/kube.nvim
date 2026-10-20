@@ -113,7 +113,7 @@ local function flash(buffer, rows)
   buffer.flash_generation = generation
   vim.defer_fn(function()
     -- A later reload flashes its own rows
-    if buffer.flash_generation == generation and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+    if buffer.flash_generation == generation and vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
       vim.api.nvim_buf_clear_namespace(buffer.buf_nr, constants.KUBE_CHANGED_NAMESPACE, 0, -1)
     end
   end, FLASH_DURATION)
@@ -190,7 +190,7 @@ function M.load(buffer)
   local pending = with_metrics and 2 or 1
   local function loaded()
     pending = pending - 1
-    if pending == 0 and data and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+    if pending == 0 and data and vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
       M.render(buffer, formatter, data, metrics)
     end
   end
@@ -202,8 +202,8 @@ function M.load(buffer)
     buffer.namespace,
     buffer.params,
     function(result)
-      -- The jobs of a wiped buffer are killed, ending without output
-      if result and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+      -- The jobs of an unloaded buffer are killed, ending without output
+      if result and vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
         data = vim.json.decode(result)
       end
       loaded()

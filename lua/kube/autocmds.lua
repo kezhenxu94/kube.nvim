@@ -8,39 +8,79 @@ local M = {}
 
 M.augroup = augroup("kube_autocmds", { clear = true })
 
+---The name of the buffer a name is an alias of, itself if none:
+---without `context/<context>/` it is pinned to the current context, so the buffer keeps operating
+---on the same cluster after the context is switched; `ns` is short for `namespaces`.
+---@param buf_name string
+---@return string|nil name
+---@return string|nil err
+function M.canonical_name(buf_name)
+  if buf_name == "kube://portforwards" then
+    return buf_name
+  end
+
+  local rest = buf_name:sub(#"kube://" + 1):gsub("^/+", "")
+  local context = rest:match("^context/[^/?]*/?")
+  if context then
+    rest = rest:sub(#context + 1)
+  else
+    local current = require("kubectl").get_current_context()
+    if not current then
+      return nil, "No current kubectl context"
+    end
+    context = string.format("context/%s/", vim.uri_encode(current, "rfc2396"))
+  end
+  rest = rest:gsub("^ns$", "namespaces"):gsub("^ns([/?])", "namespaces%1")
+  return "kube://" .. context .. rest
+end
+
 function M.setup()
   autocmd("BufReadCmd", {
     group = "kube_autocmds",
     pattern = "kube://*",
+    -- So that the BufReadCmd of the buffer an alias redirects to runs
+    nested = true,
     callback = function(ev)
       local buf_nr = ev.buf
       local buf_name = vim.api.nvim_buf_get_name(buf_nr)
       log.debug("loading buffer", buf_name)
 
-      -- Without `context/<context>/` the buffer is for the current context, pin it so it
-      -- keeps operating on the same cluster after the context is switched.
-      if not vim.startswith(buf_name, "kube://context/") and buf_name ~= "kube://portforwards" then
-        local context = require("kubectl").get_current_context()
-        if not context then
-          vim.notify("No current kubectl context", vim.log.levels.ERROR)
-          return
-        end
-
-        local rest = buf_name:sub(#"kube://" + 1):gsub("^/+", "")
-        local pinned_name = string.format("kube://context/%s/%s", vim.uri_encode(context, "rfc2396"), rest)
-        for _, other in ipairs(vim.api.nvim_list_bufs()) do
-          if vim.api.nvim_buf_get_name(other) == pinned_name then
-            vim.api.nvim_win_set_buf(0, other)
-            vim.schedule(function()
-              pcall(vim.api.nvim_buf_delete, buf_nr, { force = true })
-            end)
-            return
-          end
-        end
-        vim.api.nvim_buf_set_name(buf_nr, pinned_name)
+      local name, err = M.canonical_name(buf_name)
+      if not name then
+        vim.notify(err, vim.log.levels.ERROR)
+        return
+      end
+      -- The name is an alias: edit the canonical buffer instead, the alias is wiped, it never
+      -- becomes the alternate file or a jump.
+      if name ~= buf_name then
+        local canonical = vim.fn.bufadd(name)
+        vim.bo[canonical].buflisted = true
+        vim.cmd.buffer({ canonical, mods = { keepalt = true, keepjumps = true } })
+        vim.schedule(function()
+          pcall(vim.api.nvim_buf_delete, buf_nr, { force = true })
+        end)
+        return
       end
 
+      local parts = require("kube.buffer").parse_name(name)
+      if parts.subresource_kind == "exec" or parts.subresource_kind == "debug" then
+        require("kube.utils.exec").start(name, parts)
+        return
+      end
       KubeBuffer:new(buf_nr):load()
+    end,
+  })
+
+  -- An unloaded buffer (`:bunload`, leaving it with 'nohidden', `:e`) keeps its state, e.g. watching,
+  -- for when it is loaded again, a deleted one (`:bdelete`, `:bwipeout`) starts over.
+  autocmd("BufUnload", {
+    group = "kube_autocmds",
+    pattern = "kube://*",
+    callback = function(ev)
+      local buffer = _G.kube_buffers[ev.buf]
+      if buffer then
+        buffer:stop_jobs()
+      end
     end,
   })
 
@@ -48,11 +88,12 @@ function M.setup()
     group = "kube_autocmds",
     pattern = "kube://*",
     callback = function(ev)
-      local buf_nr = ev.buf
-      local buf_name = vim.api.nvim_buf_get_name(buf_nr)
-      log.debug("deleting buffer", buf_name, ev.buf)
-
-      require("kube.events.default").on_buf_deleted(buf_nr)
+      log.debug("deleting buffer", vim.api.nvim_buf_get_name(ev.buf), ev.buf)
+      local buffer = _G.kube_buffers[ev.buf]
+      if buffer then
+        buffer:stop_jobs()
+        _G.kube_buffers[ev.buf] = nil
+      end
     end,
   })
 

@@ -63,10 +63,21 @@ Examples: >
     :e kube://namespaces/staging/deployments " the staging namespace
     :e kube://context/production/pods        " the production context
 <
-A name without `context/{context}/` uses the current context, and is renamed
-to include it when the buffer is opened: the buffer keeps operating on that
-cluster after switching contexts with |:Kube| context. Contexts with `/` or `:`
-are percent-encoded.
+A name without `context/{context}/` is an alias for the current context:
+editing it edits the buffer with the context in its name, so the buffer keeps
+operating on that cluster after switching contexts with |:Kube| context. The
+alias buffer is wiped, it is never the |alternate-file| nor in the |jumplist|.
+Likewise `ns` is short for `namespaces`: `:e kube://ns/staging/pods` edits
+`kube://context/{context}/namespaces/staging/pods`.
+Contexts with `/` or `:` are percent-encoded.
+
+Every jump (<CR>, |gd|, |CTRL-]|, `-`, `gl`, ...) is an |:edit| of the target
+buffer in the current window, so kube buffers behave like file buffers:
+|CTRL-O|, |CTRL-^|, |CTRL-T| go back; |'hidden'| and |'bufhidden'| decide
+whether a buffer you leave is hidden or unloaded; modified buffers are
+protected as usual (|E37|, |E89|). An unloaded buffer stops its kubectl jobs
+(e.g. following logs) and loads again when edited, keeping its state (e.g.
+watching); |:bdelete| and |:bwipeout| discard the state. |:e| reloads.
 
 Kinds are group qualified (e.g. `deployment.apps`) so kubectl never picks a
 same-named kind of another API group.
@@ -80,6 +91,9 @@ Views of a resource ({sub} and {params}):
     `/portforward`          The port forwards of the resource
     `/history`              `kubectl rollout history`
     `/data`                 The decoded data of a secret, see |kube-secrets|
+    `/exec`                 A shell in the resource (|terminal|), param: `container`
+    `/debug`                A shell in an ephemeral container of a pod
+                          (`kubectl debug`), params: `image`, `target`
 Lists take kubectl flags as params, e.g. `?selector=app=web` or
 `?field-selector=involvedObject.name=web`.
 
@@ -111,7 +125,6 @@ built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
     gi      Set image
     gs      Shell (`kubectl exec`)
     g?      Help
-    q       Quit (wipe) the buffer
 
                                                                    *kube-jump*
 |CTRL-]| (and |gd|) jump to what the cell under the cursor refers to:
@@ -178,7 +191,7 @@ Defaults: >lua
         drill_down = "<cr>", show_yaml = "gd", describe = "K", parent = "-",
         refresh = "R", watch = "gw", show_logs = "gl", follow_logs = "gL",
         port_forward = "gF", forward_port = "gf", set_image = "gi",
-        exec = "gs", quit = "q", help = "g?",
+        exec = "gs", help = "g?",
       },
       -- How often watched lists (gw) reload, in ms, false to disable watching
       refresh_interval = 10000,

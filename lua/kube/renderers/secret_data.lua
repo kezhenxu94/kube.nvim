@@ -11,7 +11,7 @@ local M = {
       buffer.namespace,
       nil,
       function(result)
-        if not result or not vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+        if not result or not vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
           return
         end
         local secret = vim.json.decode(result)

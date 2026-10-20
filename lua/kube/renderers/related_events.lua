@@ -41,7 +41,7 @@ local function load_events(buffer, involved)
   track(
     buffer,
     kubectl.get(buffer.context, "events", nil, buffer.namespace, nil, function(result)
-      if not result or not vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+      if not result or not vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
         return
       end
       local events = vim.tbl_filter(function(event)
@@ -56,7 +56,7 @@ end
 function M.load(buffer)
   local resource_type, name = buffer.params["for"]:match("^(.-)/(.+)$")
   return kubectl.get(buffer.context, resource_type, name, buffer.namespace, nil, function(result)
-    if not result or not vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+    if not result or not vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
       return
     end
     local object = vim.json.decode(result)

@@ -154,31 +154,9 @@ local function handle_buffer_save(buf_nr, callback, opts)
   apply_changes(buffer, edits, resources_to_delete, opts.force, callback)
 end
 
-local function handle_buffer_delete(buf_nr, callback)
-  callback = callback or function(_) end
-
-  local buf = _G.kube_buffers[buf_nr]
-  log.debug("shutting down jobs")
-
-  if buf then
-    local kubectl = require("kubectl")
-    kubectl.kill(buf.loading_job)
-    buf.loading_job = nil
-    for pid, job in pairs(buf.jobs) do
-      log.debug("shutting down job", pid)
-      kubectl.kill(job)
-      buf.jobs[pid] = nil
-    end
-  end
-
-  _G.kube_buffers[buf_nr] = nil
-  callback(true)
-end
-
 ---@type EventHandler
 local M = {
   on_buf_saved = handle_buffer_save,
-  on_buf_deleted = handle_buffer_delete,
 }
 
 return M

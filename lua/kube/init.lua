@@ -29,10 +29,7 @@ function M.init()
     callback = function()
       local kubectl = require("kubectl")
       for _, buffer in pairs(_G.kube_buffers or {}) do
-        for pid, job in pairs(buffer.jobs) do
-          kubectl.kill(job)
-          buffer.jobs[pid] = nil
-        end
+        buffer:stop_jobs()
       end
 
       for _, portforwards in pairs(_G.portforwards) do

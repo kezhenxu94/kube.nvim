@@ -103,21 +103,6 @@ local M = {
     map(config.keymaps.refresh, "refresh the resources in the buffer", function()
       kbuf:load()
     end)
-
-    map(config.keymaps.quit, "quit the buffer", function()
-      if not vim.api.nvim_get_option_value("modified", { buf = buf_nr }) then
-        vim.api.nvim_buf_delete(buf_nr, { force = true })
-        return
-      end
-
-      require("kube.events").for_buffer(kbuf).on_buf_saved(buf_nr, function(saved)
-        if saved then
-          vim.schedule(function()
-            vim.api.nvim_buf_delete(buf_nr, { force = true })
-          end)
-        end
-      end)
-    end)
   end,
 }
 

@@ -11,7 +11,7 @@ local M = {
       buffer.resource_name,
       buffer.namespace,
       function(result)
-        if result and vim.api.nvim_buf_is_valid(buffer.buf_nr) then
+        if result and vim.api.nvim_buf_is_loaded(buffer.buf_nr) then
           buffer:set_lines(vim.split(vim.trim(result), "\n"))
         end
       end,

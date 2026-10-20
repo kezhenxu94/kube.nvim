@@ -24,7 +24,6 @@ function M.defaults()
       forward_port = "gf",
       set_image = "gi",
       exec = "gs",
-      quit = "q",
       help = "g?",
     },
     -- How often watched lists (toggled with `gw`) reload, in milliseconds, false to disable watching
