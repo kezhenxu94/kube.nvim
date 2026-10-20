@@ -716,7 +716,132 @@ describe("language server", function()
     t.eq(cell.parent.range, between.range, "the row between cells")
   end)
 
+  it("gD goes to the owner, the controller first", function()
+    local pods = vim.json.decode(t.fixture("pods.json"))
+    pods.items[1].metadata.ownerReferences = {
+      { apiVersion = "v1", kind = "Node", name = "node-1" },
+      { apiVersion = "apps/v1", kind = "ReplicaSet", name = "web-abc", controller = true },
+    }
+    t.respond("*get pods -o json*", { stdout = vim.json.encode(pods) })
+    open(PODS)
+    wait_lsp()
+    t.press_on("web-1", "gD")
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/replicaset.apps/web-abc?output=yaml")
+  end)
+
+  it("declaration in a YAML buffer is the owner of its resource", function()
+    local deployment = vim.json.decode(t.fixture("deployment-web.json"))
+    deployment.metadata.ownerReferences = { { apiVersion = "example.com/v1", kind = "App", name = "web" } }
+    t.respond("*get deployment.apps -o json web *", { stdout = vim.json.encode(deployment) })
+    open("kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml")
+    wait_lsp()
+    vim.lsp.buf.declaration()
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/app.example.com/web?output=yaml")
+  end)
+
+  ---@return lsp.Location[]
+  local function references()
+    local params = vim.lsp.util.make_position_params(0, "utf-8")
+    params.context = { includeDeclaration = false }
+    local result = vim.lsp.buf_request_sync(0, "textDocument/references", params, 2000)
+    return result[next(result)].result
+  end
+
+  it("references are the pods using the resource, as rows of a list", function()
+    local pods = vim.json.decode(t.fixture("pods.json"))
+    pods.items[2].spec.containers[1].envFrom = { { secretRef = { name = "db" } } }
+    t.respond("*get pods -o json*", { stdout = vim.json.encode(pods) })
+    open("kube://context/ctx-a/namespaces/ns1/secrets")
+    wait_lsp()
+    t.press_on("db", "")
+    local uri = "kube://context/ctx-a/namespaces/ns1/pods?using=secret/db"
+    t.eq(
+      { { uri = uri, range = { start = { line = 0, character = 0 }, ["end"] = { line = 0, character = 0 } } } },
+      references()
+    )
+    local lines = vim.api.nvim_buf_get_lines(vim.fn.bufnr(uri), 0, -1, false)
+    t.eq(1, #lines)
+    t.ok(lines[1]:find("web-2", 1, true), lines[1])
+
+    -- Again: the list is reloaded
+    t.eq(1, #references())
+    t.eq(2, #t.calls_matching("get pods"))
+  end)
+
+  it("references of a node are the pods of all namespaces on it", function()
+    open("kube://context/ctx-a/nodes")
+    wait_lsp()
+    t.press_on("node-1", "")
+    local locations = references()
+    t.eq(1, #locations)
+    t.eq("kube://context/ctx-a/pods?using=node/node-1", locations[1].uri)
+    t.eq(1, #t.calls_matching("get pods %-o json %-%-all%-namespaces %-%-field%-selector=spec.nodeName=node%-1"))
+  end)
+
+  local DEPLOYMENT_YAML = "kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml"
+
+  local function respond_deployment_yaml()
+    t.respond("*get deployment.apps web -o yaml*", {
+      stdout = table.concat({
+        "apiVersion: apps/v1",
+        "kind: Deployment",
+        "metadata:",
+        "  name: web",
+        "spec:",
+        "  template:",
+        "    spec:",
+        "      containers:",
+        "      - env:",
+        "        - name: MODE",
+        "          value: x",
+        "        image: web:1",
+        "        name: app",
+        "      - image: proxy:1",
+        "        name: sidecar",
+        "      initContainers:",
+        "      - image: busybox",
+        "        name: init",
+      }, "\n"),
+    })
+  end
+
+  it("code lenses run operations on the containers of a YAML", function()
+    respond_deployment_yaml()
+    open(DEPLOYMENT_YAML)
+    wait_lsp()
+    local result = vim.lsp.buf_request_sync(0, "textDocument/codeLens", {
+      textDocument = vim.lsp.util.make_text_document_params(0),
+    }, 2000)
+    local lenses = result[next(result)].result
+    t.eq(
+      {
+        "8 app Show logs",
+        "8 app Follow logs",
+        "8 app Exec",
+        "13 sidecar Show logs",
+        "13 sidecar Follow logs",
+        "13 sidecar Exec",
+      },
+      vim.tbl_map(function(lens)
+        return string.format("%d %s %s", lens.range.start.line, lens.command.arguments[2], lens.command.title)
+      end, lenses)
+    )
+
+    vim.lsp.get_clients({ bufnr = 0, name = "kube" })[1]:exec_cmd(lenses[5].command)
+    wait_buf_name("kube://context/ctx-a/namespaces/ns1/deployment.apps/web/logs?container=sidecar&follow=true")
+  end)
+
   if vim.fn.has("nvim-0.12") == 1 then
+    it("code lenses are shown once the YAML is loaded", function()
+      respond_deployment_yaml()
+      vim.lsp.codelens.enable(true)
+      open(DEPLOYMENT_YAML)
+      t.wait_for(function()
+        return #vim.lsp.codelens.get({ bufnr = 0 }) == 6
+      end, "the code lenses")
+      vim.lsp.codelens.enable(false)
+    end)
+
     it("an / in select the cell, the row and back", function()
       open(PODS)
       wait_lsp()

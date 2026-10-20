@@ -35,6 +35,7 @@ _G.kube_buffers = {}
 ---@field silent boolean|nil Whether the current load is a background refresh
 ---@field watch boolean|nil Whether the buffer reloads periodically, see `kube.refresh`
 ---@field flash_generation integer|nil The latest reload whose changed rows are highlighted
+---@field loaded_callbacks fun(err: string|nil)[] Called once the current load is done, see `on_loaded`
 local KubeBuffer = {}
 KubeBuffer.__index = KubeBuffer
 
@@ -119,6 +120,7 @@ function KubeBuffer:new(buf_nr)
     subresource_kind = parsed.subresource_kind,
     params = parsed.params,
     jobs = {},
+    loaded_callbacks = {},
   }, KubeBuffer)
   _G.kube_buffers[buf_nr] = this
 
@@ -189,10 +191,29 @@ function KubeBuffer:set_status(text, hl)
   end
 end
 
+---Call `fn` once the buffer is loaded, after it is rendered, or with the error of the load.
+---@param fn fun(err: string|nil)
+function KubeBuffer:on_loaded(fn)
+  table.insert(self.loaded_callbacks, fn)
+end
+
+---@param err string|nil
+function KubeBuffer:notify_loaded(err)
+  local callbacks = self.loaded_callbacks
+  self.loaded_callbacks = {}
+  -- Renderers set the lines, then the marks
+  vim.schedule(function()
+    for _, fn in ipairs(callbacks) do
+      fn(err)
+    end
+  end)
+end
+
 ---Error callback for kubectl calls loading this buffer.
 ---@return fun(err: string)
 function KubeBuffer:on_error()
   return function(err)
+    self:notify_loaded(err)
     local message = vim.split(err ~= "" and err or "kubectl failed", "\n")[1]
     self:set_status("✗ " .. message, "ErrorMsg")
     if not self.silent then
@@ -210,6 +231,7 @@ function KubeBuffer:set_lines(lines, modifiable)
   vim.api.nvim_buf_set_lines(self.buf_nr, 0, -1, false, lines)
   vim.bo[self.buf_nr].modifiable = modifiable == true
   vim.bo[self.buf_nr].modified = false
+  self:notify_loaded(nil)
 end
 
 M.KubeBuffer = KubeBuffer

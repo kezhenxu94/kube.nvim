@@ -9,11 +9,12 @@ local M = {}
 ---@return KubeConfig
 function M.defaults()
   return {
-    -- Follows Neovim's conventions: LSP (gd, K, <C-]> via 'tagfunc') and the
+    -- Follows Neovim's conventions: LSP (gd, gD, K, <C-]> via 'tagfunc') and the
     -- built-in directory browser (<CR>, -, R)
     keymaps = {
       drill_down = "<cr>",
       show_yaml = "gd",
+      owner = "gD",
       describe = "K",
       parent = "-",
       refresh = "R",

@@ -112,12 +112,13 @@ for JSON logs. There is nothing to write back: |:w| fails and keeps the edits,
 ==============================================================================
 4. Keymaps                                                      *kube-keymaps*
 
-Keymaps follow Neovim's conventions: LSP's |gd|, |K|, |CTRL-]| and the
+Keymaps follow Neovim's conventions: LSP's |gd|, |gD|, |K|, |CTRL-]| and the
 built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
 
     <CR>    Drill down: a pod's containers, a deployment's pods, a secret's
             decoded data, ...
     gd      Go to what the cell under the cursor refers to, see |kube-jump|
+    gD      Go to the owner: pod -> replica set -> deployment, job -> cron job
     K       Describe the resource under the cursor, explain a resource type
             (`kubectl explain`) in `kube://` (LSP hover)
     -       Parent: resource -> list in its namespace -> all namespaces ->
@@ -151,9 +152,17 @@ kube.nvim attaches an in-process language server named "kube" to its buffers,
 so LSP keymaps and pickers work on them:
     hover               describe, explain a resource type (|K|)
     definition          |kube-jump|
+    declaration         the owner of the resource (|gD|)
+    references          the pods using a config map, secret, persistent
+                        volume claim, service account or node (|grr|), as
+                        rows of `kube://.../pods?using={kind}/{name}`
     document symbols    the resources of the list (|gO|)
     selection ranges    the cell, the row, the list: |an| / |in| (Neovim 0.12+)
                         select them, e.g. `can` changes an editable cell
+    code lenses         Show logs, Follow logs and Exec above each container
+                        of the YAML of a pod or a workload, run with |grx|
+                        (Neovim 0.12+) or |vim.lsp.codelens.run()|; shown
+                        with |vim.lsp.codelens.enable()|
     code actions        every operation on the resource under the cursor
                         (|gra|), or on all resources of a visual selection:
 
@@ -199,7 +208,8 @@ changed and removed keys; |:w!| without confirming.
 Defaults: >lua
     require("kube").setup({
       keymaps = {
-        drill_down = "<cr>", show_yaml = "gd", describe = "K", parent = "-",
+        drill_down = "<cr>", show_yaml = "gd", owner = "gD", describe = "K",
+        parent = "-",
         refresh = "R", watch = "gw", show_logs = "gl", follow_logs = "gL",
         port_forward = "gF", forward_port = "gf", set_image = "gi",
         exec = "gs", help = "g?",

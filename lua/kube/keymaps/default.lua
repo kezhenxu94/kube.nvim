@@ -76,6 +76,10 @@ local M = {
       end
     end)
 
+    map(config.keymaps.owner, "go to the owner of the resource (LSP declaration)", function()
+      vim.lsp.buf.declaration()
+    end)
+
     map_action(config.keymaps.set_image, "set image for the resource under the cursor", "set_image")
     map_action(config.keymaps.exec, "exec into the resource under the cursor", "exec")
 

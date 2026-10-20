@@ -18,6 +18,7 @@ local M = {
         end
         if yaml then
           buffer:set_lines(vim.split(yaml, "\n"), true)
+          require("kube.lsp").refresh_code_lenses()
         elseif vim.api.nvim_buf_line_count(buffer.buf_nr) == 1 then
           -- Nothing loaded: nothing to edit and apply
           vim.bo[buffer.buf_nr].modifiable = false

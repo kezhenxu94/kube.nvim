@@ -75,11 +75,12 @@ local function confirmed(kbuf, resources, verb, call)
   end)
 end
 
----Operations on a container row of a pod's containers buffer.
+---Operations on a container of the buffer's resource: a row of a pod's containers buffer, or a
+---container of the YAML of a pod or a workload.
 ---@param kbuf KubeBuffer
 ---@param container table
 ---@return KubeOperation[]
-local function container_operations(kbuf, container)
+function M.for_container(kbuf, container)
   local function logs(params)
     utils.open({
       context = kbuf.context,
@@ -445,7 +446,7 @@ function M.for_items(kbuf, items)
   end
 
   if kbuf.subresource_kind == "containers" then
-    return #items == 1 and container_operations(kbuf, items[1]) or {}
+    return #items == 1 and M.for_container(kbuf, items[1]) or {}
   end
   if kbuf.resource_kind == "api-resources" then
     return #items == 1 and api_resource_operations(kbuf, items[1]) or {}
