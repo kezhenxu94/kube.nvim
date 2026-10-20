@@ -36,11 +36,13 @@ test-e2e: e2e-cluster
 		rm -rf $$tmp; \
 	done; exit $$failed
 
-# The README demo: a kind cluster with its own kubeconfig, recorded with asciinema in tmux
+# The README demo: a kind cluster with its own kubeconfig, recorded with asciinema in tmux.
+# The GIF is in the repo as GitHub cannot proxy images of asciinema.org.
 .PHONY: demo
 demo:
 	demo/setup.sh
 	demo/record.sh
+	agg demo/kube-nvim.cast demo/kube-nvim.gif
 
 e2e-clean:
 	KUBECONFIG=$(E2E_KUBECONFIG) kind delete cluster --name $(E2E_CLUSTER)

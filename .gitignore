@@ -2,4 +2,3 @@
 doc/tags
 demo/.kubeconfig
 demo/*.cast
-demo/*.gif
