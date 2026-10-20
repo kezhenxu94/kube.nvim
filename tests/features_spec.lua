@@ -725,6 +725,14 @@ local function edit_cell(name, column, keys)
 end
 
 describe("lists", function()
+  it("aligns the header with the sign column of the diagnostics", function()
+    open(PODS)
+    t.ok(#vim.diagnostic.get(0) > 0, "an unhealthy pod")
+    local textoff = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1].textoff
+    t.ok(textoff > 0, "a sign column")
+    t.eq(string.rep(" ", textoff) .. "%#", vim.wo.winbar:sub(1, textoff + 2))
+  end)
+
   it("show deleted rows until they are written or restored", function()
     open(PODS)
     -- Like typing, so each delete can be undone

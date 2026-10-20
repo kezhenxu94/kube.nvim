@@ -36,6 +36,12 @@ test-e2e: e2e-cluster
 		rm -rf $$tmp; \
 	done; exit $$failed
 
+# The README demo: a kind cluster with its own kubeconfig, recorded with asciinema in tmux
+.PHONY: demo
+demo:
+	demo/setup.sh
+	demo/record.sh
+
 e2e-clean:
 	KUBECONFIG=$(E2E_KUBECONFIG) kind delete cluster --name $(E2E_CLUSTER)
 	rm -f $(E2E_KUBECONFIG)

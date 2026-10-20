@@ -1,2 +1,5 @@
 .e2e-kubeconfig
 doc/tags
+demo/.kubeconfig
+demo/*.cast
+demo/*.gif

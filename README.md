@@ -2,7 +2,7 @@
 
 Neovim Kubernetes plugin, manage your Kubernetes resources like a buffer!
 
-https://github.com/user-attachments/assets/822aa52d-f9ca-4208-bbfe-d2d95cfb90c5
+[![kube.nvim demo](https://asciinema.org/a/1269109.svg)](https://asciinema.org/a/1269109)
 
 ## Installation
 

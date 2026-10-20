@@ -291,7 +291,6 @@ function M.render(buffer, formatter, data, metrics)
 
   local header_row, formatted_rows = M.format_table(headers, rows)
   self.header_row = header_row
-  utils.update_winbar(self)
 
   local lines = {}
   for _, row in ipairs(formatted_rows) do
@@ -357,6 +356,8 @@ function M.render(buffer, formatter, data, metrics)
   if #diagnostics > 0 then
     vim.diagnostic.set(constants.KUBE_DIAGNOSTICS_NAMESPACE, self.buf_nr, diagnostics, {})
   end
+  -- After the diagnostics, whose signs may change the width of the sign column the header is aligned with
+  utils.update_winbar(self)
   -- Only reloads of a watched list: a reload asked for shows the changes it was asked for
   if self.silent then
     flash(self, changed)

@@ -1,0 +1,2 @@
+PS1='$ '
+alias nvim='nvim --clean -u demo/init.lua'
