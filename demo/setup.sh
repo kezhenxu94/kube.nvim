@@ -15,3 +15,8 @@ kubectl apply -f "$dir/manifests.yaml"
 for deployment in web api; do
   kubectl -n demo rollout status "deployment/$deployment" --timeout=180s
 done
+
+# A Helm release with two revisions, for its history and rollback
+helm uninstall storefront -n demo --ignore-not-found --wait
+helm install storefront "$dir/chart" -n demo
+helm upgrade storefront "$dir/chart" -n demo --set theme=dark

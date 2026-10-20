@@ -79,6 +79,21 @@ keys C-o && sleep 2
 for _ in 1 2 3; do
   keys - && sleep 2
 done
+
+# Helm releases: K shows the status, <CR> the manifest, rollback from the history
+run ":e kube://ns/demo/helm" 3
+run "/storefront" 1
+keys K && sleep 4
+keys l && sleep 1
+keys Enter && sleep 3
+keys C-o && sleep 2
+keys gra && sleep 3
+run "6" 3
+keys gg && sleep 1
+keys gra && sleep 3
+run "1" 2
+run "1" 4
+
 keys 'g?' && sleep 5
 keys q && sleep 1
 
