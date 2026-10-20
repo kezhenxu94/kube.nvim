@@ -5,6 +5,8 @@ require("kubectl")
 
 local RELEASES = "kube://context/ctx-a/helm-releases"
 local WEB = "kube://context/ctx-a/namespaces/ns1/helm-releases/web"
+-- Every status, helm 3 and 4 list different ones by default
+local LIST = "helm --kube-context ctx-a list --deployed --failed --pending --superseded --uninstalled --uninstalling"
 
 ---@param name string
 local function open(name)
@@ -66,7 +68,7 @@ before_each(function()
   t.reset_kubectl()
   _G.kube.context = nil
   t.respond("*config current-context*", { stdout = "ctx-a\n" })
-  t.respond("helm *list --all -o json*", { fixture = "helm-list.json" })
+  t.respond("helm *list * -o json*", { fixture = "helm-list.json" })
   t.respond("helm *history web -o json*", { fixture = "helm-history.json" })
   t.respond("helm *status web*", { stdout = "NAME: web\nSTATUS: deployed\n" })
   t.respond("helm *get values web -o yaml*", { stdout = "replicas: 2\n" })
@@ -84,7 +86,7 @@ describe("helm releases", function()
   it("are listed in all namespaces, or in one, of the buffer's context", function()
     open("kube://helm-releases")
     wait_buf_name(RELEASES)
-    t.eq({ "helm --kube-context ctx-a list --all -o json -A" }, t.calls_matching("^helm"))
+    t.eq({ LIST .. " -o json -A" }, t.calls_matching("^helm"))
     t.eq(2, #t.lines())
     t.ok(t.lines()[1]:match("^ns1%s+web%s+3%s+deployed%s+web%-1%.2%.0%s+1%.2%s+%d+d%s*$"), t.lines()[1])
 
@@ -92,7 +94,7 @@ describe("helm releases", function()
     t.respond("*config current-context*", { stdout = "ctx-a\n" })
     t.respond("helm *list*", { stdout = "[]" })
     open("kube://ns/ns1/helm-releases")
-    t.eq({ "helm --kube-context ctx-a list --all -o json -n ns1" }, t.calls_matching("^helm"))
+    t.eq({ LIST .. " -o json -n ns1" }, t.calls_matching("^helm"))
     t.eq("No releases found", t.status())
   end)
 
@@ -171,14 +173,14 @@ describe("helm releases", function()
   end)
 
   it("deleting a line and :w uninstalls the release after confirming", function()
-    t.respond("helm *uninstall*", { stdout = 'release "db" uninstalled' })
+    t.respond("helm * uninstall *", { stdout = 'release "db" uninstalled' })
     local seen = prompts()
     open(RELEASES)
     t.press_on("db", "dd")
     vim.cmd.write()
-    wait_call("uninstall")
+    wait_call(" uninstall ")
     t.eq({ "Apply the changes (context: ctx-a)?\n  Uninstall helm release ns2/db" }, seen)
-    t.eq({ "helm --kube-context ctx-a uninstall db -n ns2" }, t.calls_matching("uninstall"))
+    t.eq({ "helm --kube-context ctx-a uninstall db -n ns2" }, t.calls_matching(" uninstall "))
   end)
 
   it("operations are offered as code actions", function()
@@ -234,7 +236,7 @@ describe("helm releases", function()
   end)
 
   it("uninstall several releases at once", function()
-    t.respond("helm *uninstall*", { stdout = "uninstalled" })
+    t.respond("helm * uninstall *", { stdout = "uninstalled" })
     prompts()
     open(RELEASES)
     wait_lsp()
@@ -249,7 +251,7 @@ describe("helm releases", function()
       range = { start = { 1, 0 }, ["end"] = { 2, 0 } },
     })
     t.wait_for(function()
-      return #t.calls_matching("uninstall") == 2
+      return #t.calls_matching(" uninstall ") == 2
     end, "two uninstalls")
     t.eq({ "Uninstall 2 releases" }, titles)
   end)

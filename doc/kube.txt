@@ -219,7 +219,7 @@ buffer, like the other lists: >
     :e kube://ns/staging/helm                " short for `helm-releases`
     :Kube get helm namespace=staging
 <
-The list (`helm list --all`) shows releases of all statuses: failed releases
+The list (`helm list`) shows releases of all statuses: failed releases
 are errors and pending ones warnings, see |]d|.
 
 Views of a release, `kube://.../namespaces/{ns}/helm-releases/{name}[/{sub}]`:

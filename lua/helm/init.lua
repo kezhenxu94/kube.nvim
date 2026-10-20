@@ -66,13 +66,17 @@ local function helm(context, namespace, args, callback, on_error)
   return job
 end
 
----The releases, of all statuses (`--all`), as JSON.
+-- Every status: helm 3 lists deployed and failed releases by default and helm 4 has no `--all`
+local STATUSES = { "--deployed", "--failed", "--pending", "--superseded", "--uninstalled", "--uninstalling" }
+
+---The releases, of all statuses, as JSON.
 ---@param context string|nil
 ---@param namespace string|nil "all" for all namespaces
 ---@param callback fun(data: string|nil)
 ---@param on_error fun(data: string)|nil
 function M.list(context, namespace, callback, on_error)
-  local args = { "list", "--all", "-o", "json" }
+  local args = vim.list_extend({ "list" }, STATUSES)
+  vim.list_extend(args, { "-o", "json" })
   if namespace and namespace:lower() == "all" then
     table.insert(args, "-A")
   end

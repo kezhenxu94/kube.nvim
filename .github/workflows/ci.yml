@@ -9,8 +9,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: JohnnyMorganz/stylua-action@v4
+      - uses: actions/checkout@v7
+      - uses: JohnnyMorganz/stylua-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.5.2
@@ -25,7 +25,7 @@ jobs:
         # The oldest supported version, the latest release and nightly
         neovim: [v0.11.0, stable, nightly]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
@@ -36,7 +36,7 @@ jobs:
     name: e2e (kind)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
@@ -45,7 +45,7 @@ jobs:
         with:
           install_only: true
           version: v0.23.0
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: make test-e2e
       - if: failure()
         run: KUBECONFIG=.e2e-kubeconfig kubectl --context kind-kube-nvim-e2e -n kube-e2e get all,events
