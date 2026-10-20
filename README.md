@@ -10,11 +10,13 @@ For Docker, see [docker.nvim](https://github.com/kezhenxu94/docker.nvim), the sa
 
 Requirements: Neovim >= 0.11 and `kubectl` in `$PATH`, `helm` too for Helm releases. No other plugin dependencies.
 
-With [lazy.nvim](https://github.com/folke/lazy.nvim):
+With Neovim's built-in plugin manager, [`vim.pack`](https://neovim.io/doc/user/pack.html#vim.pack) (Neovim >= 0.12):
 
 ```lua
-{ "kezhenxu94/kube.nvim" }
+vim.pack.add({ "https://github.com/kezhenxu94/kube.nvim" })
 ```
+
+On Neovim 0.11, install it with your plugin manager.
 
 `setup()` is optional, call it only to change the [configuration](#configuration). Run `:checkhealth kube` to check kubectl and the cluster.
 
