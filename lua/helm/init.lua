@@ -33,8 +33,10 @@ end
 ---@param args string[] The helm arguments
 ---@param callback fun(data: string|nil)|nil Called with stdout on success, nil on failure
 ---@param on_error fun(data: string)|nil Called with stderr on failure
+---@param mutation boolean|nil Never killed: helm bounds its hooks with its own `--timeout`,
+---and killing it mid-operation leaves the release stuck in a pending status
 ---@return vim.SystemObj|nil
-local function helm(context, namespace, args, callback, on_error)
+local function helm(context, namespace, args, callback, on_error, mutation)
   local cmd = { "helm" }
   if context then
     vim.list_extend(cmd, { "--kube-context", context })
@@ -47,7 +49,7 @@ local function helm(context, namespace, args, callback, on_error)
     vim.system,
     cmd,
     -- Fail instead of hanging when the API server is unreachable
-    { text = true, timeout = timeout_ms() },
+    { text = true, timeout = not mutation and timeout_ms() or nil },
     vim.schedule_wrap(function(out)
       local success = out.code == 0
       if not success and on_error then
@@ -135,7 +137,7 @@ function M.rollback(context, name, namespace, revision, callback, on_error)
   if revision then
     table.insert(args, tostring(revision))
   end
-  return helm(context, namespace, args, callback, on_error)
+  return helm(context, namespace, args, callback, on_error, true)
 end
 
 ---@param context string|nil
@@ -144,7 +146,7 @@ end
 ---@param callback fun(data: string|nil)|nil
 ---@param on_error fun(data: string)|nil
 function M.uninstall(context, name, namespace, callback, on_error)
-  return helm(context, namespace, { "uninstall", name }, callback, on_error)
+  return helm(context, namespace, { "uninstall", name }, callback, on_error, true)
 end
 
 return M
