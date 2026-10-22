@@ -10,8 +10,8 @@ M.augroup = augroup("kube_autocmds", { clear = true })
 
 ---The name of the buffer a name is an alias of, itself if none:
 ---without `context/<context>/` it is pinned to the current context, so the buffer keeps operating
----on the same cluster after the context is switched; `ns` is short for `namespaces`, `helm` for
----`helm-releases`; no kind is the resource types, `api-resources`.
+---on the same cluster after the context is switched; `ctx` is short for `context`, `ns` for
+---`namespaces`, `helm` for `helm-releases`; no kind is the resource types, `api-resources`.
 ---@param buf_name string
 ---@return string|nil name
 ---@return string|nil err
@@ -20,7 +20,7 @@ function M.canonical_name(buf_name)
     return buf_name
   end
 
-  local rest = buf_name:sub(#"kube://" + 1):gsub("^/+", "")
+  local rest = buf_name:sub(#"kube://" + 1):gsub("^/+", ""):gsub("^ctx/", "context/")
   local context = rest:match("^context/[^/?]*/?")
   if context then
     rest = rest:sub(#context + 1)

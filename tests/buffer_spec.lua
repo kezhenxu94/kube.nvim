@@ -103,6 +103,15 @@ describe("canonical buffer names", function()
     t.eq("kube://context/ctx-a/pods/ns", canonical_name("kube://pods/ns"))
   end)
 
+  it("expands ctx to context", function()
+    t.eq("kube://context/c/pods", canonical_name("kube://ctx/c/pods"))
+    t.eq("kube://context/c/namespaces/prod/pods", canonical_name("kube://ctx/c/ns/prod/pods"))
+    t.eq("kube://context/c/api-resources", canonical_name("kube://ctx/c"))
+    -- A namespace named ctx, a pod named ctx
+    t.eq("kube://context/ctx-a/namespaces/ctx/pods", canonical_name("kube://ns/ctx/pods"))
+    t.eq("kube://context/ctx-a/pods/ctx", canonical_name("kube://pods/ctx"))
+  end)
+
   it("expands helm to helm-releases", function()
     t.eq("kube://context/ctx-a/helm-releases", canonical_name("kube://helm"))
     t.eq("kube://context/c/namespaces/prod/helm-releases", canonical_name("kube://context/c/ns/prod/helm"))

@@ -71,8 +71,8 @@ A name without `context/{context}/` is an alias for the current context:
 editing it edits the buffer with the context in its name, so the buffer keeps
 operating on that cluster after switching contexts with |:Kube| context. The
 alias buffer is wiped, it is never the |alternate-file| nor in the |jumplist|.
-Likewise `ns` is short for `namespaces` (and `helm` for `helm-releases`, see
-|kube-helm|): `:e kube://ns/staging/pods` edits
+Likewise `ctx` is short for `context`, `ns` for `namespaces` (and `helm` for
+`helm-releases`, see |kube-helm|): `:e kube://ns/staging/pods` edits
 `kube://context/{context}/namespaces/staging/pods`, and a name without {kind}
 edits `api-resources`: the resource types of the cluster (`kubectl
 api-resources`). <CR> or |CTRL-]| on one lists it, in {ns} for namespaced

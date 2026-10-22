@@ -36,7 +36,7 @@ Every view is a buffer named `kube://[context/{context}/][namespaces/{namespace}
 * `:e kube://`: The resource types of the cluster, `<CR>` on one lists it.
 * `:e kube://deployments`: Deployments in all namespaces, in the current context.
 * `:e kube://namespaces/staging/deployments`: Deployments in the `staging` namespace, or `:e kube://ns/staging/deployments` for short.
-* `:e kube://context/production/pods`: Pods in the `production` context.
+* `:e kube://context/production/pods`: Pods in the `production` context, or `:e kube://ctx/production/pods` for short.
 * `:e kube://ns/staging/helm`: Helm releases in the `staging` namespace.
 
 A buffer opened without `context/{context}/` is bound to the context that was current when it was opened. Reloading, editing and deleting from it keep operating on that cluster even after you switch to another context.
