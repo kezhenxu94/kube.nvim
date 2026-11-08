@@ -47,7 +47,7 @@ function! helm#format#releases(releases, kbuf) abort
       call add(diagnostics, {'message': 'The release is ' . status, 'severity': 'warn'})
     endif
     call add(rows, {
-          \ 'row': [release.namespace, release.name, kube#utils#to_string(release.revision), status,
+          \ 'row': [release.namespace, release.name, resource#to_string(release.revision), status,
           \   kube#utils#get(release, 'chart', ''), kube#utils#get(release, 'app_version', ''),
           \   helm#format#age(get(release, 'updated', v:null))],
           \ 'highlights': {'STATUS': highlight},
@@ -55,7 +55,7 @@ function! helm#format#releases(releases, kbuf) abort
           \   'kind': 'HelmRelease',
           \   'name': release.name,
           \   'namespace': release.namespace,
-          \   'revision': str2nr(kube#utils#to_string(release.revision)),
+          \   'revision': str2nr(resource#to_string(release.revision)),
           \   'status': status,
           \ },
           \ 'diagnostics': diagnostics,
@@ -70,16 +70,16 @@ function! helm#format#history(revisions, kbuf) abort
   for revision in a:revisions
     let status = kube#utils#get(revision, 'status', '')
     call add(rows, {
-          \ 'row': [kube#utils#to_string(revision.revision), helm#format#age(get(revision, 'updated', v:null)), status,
+          \ 'row': [resource#to_string(revision.revision), helm#format#age(get(revision, 'updated', v:null)), status,
           \   kube#utils#get(revision, 'chart', ''), kube#utils#get(revision, 'app_version', ''),
           \   kube#utils#get(revision, 'description', '')],
           \ 'highlights': {'STATUS': helm#format#highlight(empty(status) ? 'unknown' : status)},
           \ 'item': {
           \   'kind': 'HelmRevision',
-          \   'name': kube#utils#to_string(revision.revision),
+          \   'name': resource#to_string(revision.revision),
           \   'release': a:kbuf.resource_name,
           \   'namespace': a:kbuf.namespace,
-          \   'revision': str2nr(kube#utils#to_string(revision.revision)),
+          \   'revision': str2nr(resource#to_string(revision.revision)),
           \ },
           \ })
   endfor

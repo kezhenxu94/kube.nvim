@@ -96,7 +96,7 @@ call t#it('lists pods', function('s:test_pods'))
 function! s:test_describe() abort
   call s:open(s:list('pods'))
   call t#press_on('web-', 'K')
-  call t#wait_for({-> !empty(filter(kube#compat#floats(), 'join(v:val[1], "\n") =~# "Namespace:\\s\\+kube-e2e"'))}, 'describe', s:TIMEOUT)
+  call t#wait_for({-> !empty(filter(resource#compat#floats(), 'join(v:val[1], "\n") =~# "Namespace:\\s\\+kube-e2e"'))}, 'describe', s:TIMEOUT)
 endfunction
 call t#it('describes in a float', function('s:test_describe'))
 
@@ -158,7 +158,7 @@ function! s:test_scale_cell() abort
   call s:open(s:list('deployments'))
   call t#answer_yes()
   let kbuf = t#kbuf()
-  let cells = kube#compat#cells(kbuf.bufnr)
+  let cells = resource#compat#cells(kbuf.bufnr)
   for [id, cell] in items(kbuf.cells)
     if cell.column ==# 'DESIRED' && cell.item.metadata.name ==# 'web'
       call cursor(cells[id][0], cells[id][1] + 1)

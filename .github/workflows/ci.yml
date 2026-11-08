@@ -21,18 +21,26 @@ jobs:
           - { editor: nvim, version: nightly }
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: kezhenxu94/resource.vim
+          path: resource.vim
       - uses: rhysd/action-setup-vim@v1
         id: vim
         with:
           neovim: ${{ matrix.editor == 'nvim' }}
           version: ${{ matrix.version }}
-      - run: make test-${{ matrix.editor }} VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.vim.outputs.executable }}
+      - run: make test-${{ matrix.editor }} RESOURCE_VIM=resource.vim VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.vim.outputs.executable }}
 
   e2e:
     name: e2e (kind)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: kezhenxu94/resource.vim
+          path: resource.vim
       - uses: rhysd/action-setup-vim@v1
         id: vim
         with:
@@ -47,6 +55,6 @@ jobs:
           install_only: true
           version: v0.23.0
       - uses: azure/setup-helm@v5
-      - run: make test-e2e VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.nvim.outputs.executable }}
+      - run: make test-e2e RESOURCE_VIM=resource.vim VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.nvim.outputs.executable }}
       - if: failure()
         run: KUBECONFIG=.e2e-kubeconfig kubectl --context kind-kube-nvim-e2e -n kube-e2e get all,events

@@ -2,7 +2,9 @@
 "   vim -Nu NONE -i NONE --not-a-term --cmd "let g:spec = 'tests/x_spec.vim'" -S tests/runner.vim
 "   nvim --headless -u NONE -i NONE --cmd "let g:spec = 'tests/x_spec.vim'" -S tests/runner.vim
 let s:root = fnamemodify(expand('<sfile>:p'), ':h:h')
-execute 'set runtimepath^=' . fnameescape(s:root) . ',' . fnameescape(s:root . '/tests')
+" resource.vim, see the Makefile
+execute 'set runtimepath^=' . fnameescape(s:root) . ',' . fnameescape(s:root . '/tests') . ','
+      \ . fnameescape(fnamemodify(empty($RESOURCE_VIM) ? s:root . '/../resource.vim' : $RESOURCE_VIM, ':p'))
 " Neovim's defaults, which the tests assume
 set hidden nomore
 " The end-to-end tests use the real kubectl against a cluster
@@ -13,6 +15,7 @@ let $KUBE_TEST_DIR = tempname()
 call mkdir($KUBE_TEST_DIR, 'p')
 
 " Loaded like at startup
+runtime plugin/resource.vim
 runtime plugin/kube.vim
 
 let g:t_tests = []

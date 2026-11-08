@@ -92,7 +92,7 @@ function! s:test_status() abort
   call t#press_on('web', 'K')
   let float = t#wait_float('STATUS: deployed')
   call assert_equal(['NAME: web', 'STATUS: deployed'], getbufline(winbufnr(float), 1, '$'))
-  call kube#compat#close_float(float)
+  call resource#compat#close_float(float)
 endfunction
 call t#it('K shows the status', function('s:test_status'))
 

@@ -24,17 +24,17 @@ function! kube#apply#apply(context, namespace, file, opts, Done) abort
   endif
   call kube#kubectl#diff(a:context, a:namespace, a:file,
         \ function('s:on_diff', [a:context, a:namespace, a:file, a:opts.title, a:Done]),
-        \ {err -> kube#ui#notify('Failed to diff: ' . err, 'error')})
+        \ {err -> resource#notify('Failed to diff: ' . err, 'error')})
 endfunction
 
 function! s:apply(context, namespace, file, Done) abort
   call kube#kubectl#apply(a:context, a:namespace, a:file, function('s:on_applied', [a:Done]),
-        \ {err -> kube#ui#notify('Failed to apply: ' . err, 'error')})
+        \ {err -> resource#notify('Failed to apply: ' . err, 'error')})
 endfunction
 
 function! s:on_applied(Done, result) abort
   if a:result isnot v:null
-    call kube#ui#notify(trim(a:result))
+    call resource#notify(trim(a:result))
   endif
   call a:Done(a:result isnot v:null)
 endfunction
@@ -44,14 +44,14 @@ function! s:on_diff(context, namespace, file, title, Done, diff) abort
     call a:Done(0)
     return
   elseif a:diff ==# ''
-    call kube#ui#notify('No changes to apply')
+    call resource#notify('No changes to apply')
     call a:Done(1)
     return
   endif
   let win = kube#apply#show_split(split(trim(a:diff), "\n"), 'diff')
   " Show the diff before prompting
   redraw
-  call kube#ui#confirm(a:title, function('s:on_confirm', [win, a:context, a:namespace, a:file, a:Done]))
+  call resource#confirm(a:title, function('s:on_confirm', [win, a:context, a:namespace, a:file, a:Done]))
 endfunction
 
 function! s:on_confirm(win, context, namespace, file, Done, confirmed) abort

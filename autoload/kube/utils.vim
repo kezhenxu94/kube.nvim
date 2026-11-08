@@ -27,29 +27,6 @@ function! kube#utils#list(dict, key) abort
   return type(value) == v:t_list ? value : []
 endfunction
 
-" A param value as in buffer names: true, false or the text.
-function! kube#utils#to_string(value) abort
-  if a:value is v:true
-    return 'true'
-  elseif a:value is v:false
-    return 'false'
-  endif
-  return type(a:value) == v:t_string ? a:value : string(a:value)
-endfunction
-
-" Percent-encode bytes other than RFC 2396 unreserved characters.
-function! kube#utils#uri_encode(text) abort
-  return substitute(a:text, "[^A-Za-z0-9_.!~*'()-]", '\=s:encode(submatch(0))', 'g')
-endfunction
-
-function! s:encode(char) abort
-  return join(map(range(len(a:char)), 'printf("%%%02x", char2nr(a:char[v:val]))'), '')
-endfunction
-
-function! kube#utils#uri_decode(text) abort
-  return substitute(a:text, '%\(\x\x\)', '\=eval(''"\x'' . submatch(1) . ''"'')', 'g')
-endfunction
-
 " A buffer name:
 " kube://[context/{context}/][namespaces/{ns}/]{kind}[/{name}[/{subresource}]][?{params}]
 " {opts}: context (none for the current one), namespace (none or 'all' for
@@ -59,7 +36,7 @@ function! kube#utils#buf_name(opts) abort
   let context = kube#utils#get(a:opts, 'context', '')
   if !empty(context)
     " Encoded as context names may contain / and :, e.g. EKS ARNs
-    call extend(parts, ['context', kube#utils#uri_encode(context)])
+    call extend(parts, ['context', resource#uri_encode(context)])
   endif
   let namespace = kube#utils#get(a:opts, 'namespace', '')
   if !empty(namespace) && tolower(namespace) !=# 'all'
@@ -77,7 +54,7 @@ function! kube#utils#buf_name(opts) abort
   let buf_name = join(parts, '/')
 
   let params = kube#utils#get(a:opts, 'params', {})
-  let query = sort(map(items(params), 'v:val[0] . "=" . kube#utils#to_string(v:val[1])'))
+  let query = sort(map(items(params), 'v:val[0] . "=" . resource#to_string(v:val[1])'))
   if !empty(query)
     let buf_name .= '?' . join(query, '&')
   endif
@@ -86,12 +63,7 @@ endfunction
 
 " Edit the buffer of the name built from {opts}.
 function! kube#utils#open(opts) abort
-  call kube#utils#edit(kube#utils#buf_name(a:opts))
-endfunction
-
-" Edit {name}, escaped as % (from the encoded context) and # are expanded.
-function! kube#utils#edit(name) abort
-  execute 'edit' fnameescape(a:name)
+  call resource#open(kube#utils#buf_name(a:opts))
 endfunction
 
 " Key of the port forwards of a resource, see kube#portforward#all().
@@ -139,27 +111,4 @@ endfunction
 " The time since {created}, an RFC 3339 UTC timestamp.
 function! kube#utils#calculate_age(created) abort
   return kube#utils#format_duration(localtime() - kube#utils#parse_time(a:created))
-endfunction
-
-" The table header for the winbar of {win}, aligned with its number and sign
-" columns and its horizontal scroll.
-function! kube#utils#get_winbar(bufnr, win) abort
-  let kbuf = kube#buffer#get(a:bufnr)
-  if empty(kbuf) || empty(get(kbuf, 'header_row', {}))
-    return ''
-  endif
-  let header_row = kbuf.header_row
-  let info = getwininfo(a:win)
-  let padding = repeat(' ', empty(info) ? 0 : info[0].textoff)
-  let leftcol = 0
-  call win_execute(a:win, 'let leftcol = winsaveview().leftcol')
-  let indicator = kbuf.watch ? ' ' . kube#refresh#indicator() . ' ' : ''
-  let width = winwidth(a:win) - len(padding) - strdisplaywidth(indicator)
-  let header = strpart(header_row.formatted, leftcol, max([width, 0]))
-  return printf('%s%%#%s#%s%%=%%#Comment#%s', padding, header_row.highlight, header, indicator)
-endfunction
-
-" Update the header of the windows showing the buffer.
-function! kube#utils#update_winbar(kbuf) abort
-  call kube#compat#set_header(a:kbuf.bufnr, {win -> kube#utils#get_winbar(a:kbuf.bufnr, win)})
 endfunction

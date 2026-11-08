@@ -24,7 +24,7 @@ function! s:test_loaded_once() abort
   unlet g:loaded_kube
   runtime plugin/kube.vim
   runtime plugin/kube.vim
-  call assert_equal(1, len(filter(split(execute('autocmd kube_autocmds BufReadCmd'), "\n"), 'v:val =~# "kube#autocmds#read"')))
+  call assert_equal(1, len(filter(split(execute('autocmd resource_kube BufReadCmd'), "\n"), 'v:val =~# "resource#buffer#on_read"')))
 endfunction
 call t#it('is loaded once', function('s:test_loaded_once'))
 
@@ -32,7 +32,7 @@ function! s:test_highlight_links() abort
   colorscheme default
   call assert_match('links to ' . (has('nvim') ? 'DiagnosticError' : 'ErrorMsg'), execute('highlight KubeFailed'))
   highlight KubeFailed guifg=#654321
-  call kube#highlights#setup()
+  call resource#highlights()
   call assert_match('guifg=#654321', execute('highlight KubeFailed'))
 endfunction
 call t#it('links highlights to the colorscheme unless defined', function('s:test_highlight_links'))

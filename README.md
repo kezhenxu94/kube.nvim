@@ -8,18 +8,19 @@ For Docker, see [docker.nvim](https://github.com/kezhenxu94/docker.nvim), the sa
 
 ## Installation
 
-Requirements: Vim >= 9.2 or Neovim >= 0.11, and `kubectl` in `$PATH`, `helm` too for Helm releases. No other plugin dependencies.
+Requirements: Vim >= 9.2 or Neovim >= 0.11, and `kubectl` in `$PATH`, `helm` too for Helm releases, and [resource.vim](https://github.com/kezhenxu94/resource.vim), the core shared with docker.nvim.
 
 With Vim's packages:
 
 ```sh
+git clone https://github.com/kezhenxu94/resource.vim ~/.vim/pack/plugins/start/resource.vim
 git clone https://github.com/kezhenxu94/kube.nvim ~/.vim/pack/plugins/start/kube.nvim
 ```
 
 With Neovim's built-in plugin manager, [`vim.pack`](https://neovim.io/doc/user/pack.html#vim.pack) (Neovim >= 0.12):
 
 ```lua
-vim.pack.add({ "https://github.com/kezhenxu94/kube.nvim" })
+vim.pack.add({ "https://github.com/kezhenxu94/resource.vim", "https://github.com/kezhenxu94/kube.nvim" })
 ```
 
 Or with your plugin manager. Nothing to set up, `g:kube_*` variables change the [configuration](#configuration).
@@ -128,7 +129,7 @@ We welcome contributions to kube.nvim! If you would like to contribute, please f
 2. Make your changes and ensure that the code passes all tests.
 3. Submit a pull request with a description of your changes.
 
-* `make test`: Tests in Vim and in headless Neovim (`make test-vim` / `make test-nvim` for one of them, `VIM=` / `NVIM=` to pick the executables) against a fake `kubectl` (`tests/bin/kubectl`), never a real cluster.
+* `make test`: Tests in Vim and in headless Neovim (`make test-vim` / `make test-nvim` for one of them, `VIM=` / `NVIM=` to pick the executables) against a fake `kubectl` (`tests/bin/kubectl`), never a real cluster. They use the resource.vim checkout `RESOURCE_VIM`, `../resource.vim` by default.
 * `make test-e2e`: End-to-end tests against a [kind](https://kind.sigs.k8s.io) cluster `kube-nvim-e2e`, created with its own kubeconfig (`.e2e-kubeconfig`) so your kubeconfig and current context are left untouched. `make e2e-clean` deletes it. Without a reachable cluster the end-to-end tests are skipped.
 
 If you encounter any issues or have any questions, please open an issue on the repository.

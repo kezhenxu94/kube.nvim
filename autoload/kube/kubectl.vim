@@ -8,7 +8,7 @@
 let s:context = v:null
 
 function! s:state_file() abort
-  return kube#compat#state_file('kube_state.json')
+  return resource#state_dir() . '/kube_state.json'
 endfunction
 
 function! s:load_state() abort
@@ -51,9 +51,9 @@ function! s:kubectl(context, args, Callback, OnError, ...) abort
   let args = copy(a:args)
   if !get(opts, 'stream', 0)
     " Fail instead of hanging when the API server is unreachable
-    call insert(args, '--request-timeout=' . kube#config#get('request_timeout'))
+    call insert(args, '--request-timeout=' . resource#config('kube', 'request_timeout'))
   endif
-  return kube#compat#run(s:with_context(a:context, args),
+  return resource#job(s:with_context(a:context, args),
         \ {'on_exit': function('s:on_exit', [get(opts, 'ok_codes', [0]), get(opts, 'full', 0), a:Callback, a:OnError])})
 endfunction
 
@@ -75,8 +75,8 @@ endfunction
 " Run kubectl synchronously, for completion: bounded so that an unreachable
 " cluster cannot freeze the editor. Returns the lines of stdout, [] on failure.
 function! s:kubectl_sync(context, args) abort
-  let cmd = s:with_context(a:context, ['--request-timeout=' . kube#config#get('request_timeout')] + a:args)
-  let [code, stdout] = kube#compat#system(cmd, s:SYNC_TIMEOUT_MS)
+  let cmd = s:with_context(a:context, ['--request-timeout=' . resource#config('kube', 'request_timeout')] + a:args)
+  let [code, stdout] = resource#system(cmd, s:SYNC_TIMEOUT_MS)
   return code == 0 ? split(stdout, "\n") : []
 endfunction
 
@@ -93,7 +93,7 @@ function! kube#kubectl#get(context, kind, name, namespace, params, Callback, OnE
     call extend(args, s:namespace_args(a:namespace))
   endif
   for key in sort(keys(a:params))
-    call add(args, printf('--%s=%s', key, kube#utils#to_string(a:params[key])))
+    call add(args, printf('--%s=%s', key, resource#to_string(a:params[key])))
   endfor
   return s:kubectl(a:context, args, a:Callback, a:OnError)
 endfunction
@@ -103,16 +103,15 @@ function! kube#kubectl#get_resource_yaml(context, kind, name, namespace, Callbac
   return s:kubectl(a:context, args, a:Callback, a:OnError)
 endfunction
 
-" Logs, {opts}: container, follow, previous, all_containers, since, tail
-" (g:kube_logs_tail by default). {Callback} gets complete lines, newline
-" separated, of stdout and stderr: the errors are shown in place of the logs.
-function! kube#kubectl#logs(context, kind, name, namespace, opts, Callback) abort
+" The command of the logs, {opts}: container, follow, previous,
+" all_containers, since, tail (g:kube_logs_tail by default).
+function! kube#kubectl#logs_cmd(context, kind, name, namespace, opts) abort
   let args = ['logs', s:ref(a:kind, a:name)]
   if !empty(get(a:opts, 'container', ''))
     call extend(args, ['-c', a:opts.container])
   endif
   call extend(args, s:namespace_args(a:namespace))
-  call add(args, '--tail=' . get(a:opts, 'tail', kube#config#get('logs_tail')))
+  call add(args, '--tail=' . get(a:opts, 'tail', resource#config('kube', 'logs_tail')))
   if get(a:opts, 'previous', 0)
     call add(args, '--previous')
   endif
@@ -122,43 +121,13 @@ function! kube#kubectl#logs(context, kind, name, namespace, opts, Callback) abor
   if !empty(get(a:opts, 'since', ''))
     call add(args, '--since=' . a:opts.since)
   endif
-
-  if !get(a:opts, 'follow', 0)
-    return s:kubectl(a:context, args, function('s:logs_done', [a:Callback]), a:Callback)
+  if get(a:opts, 'follow', 0)
+    call add(args, '-f')
+  else
+    " Fail instead of hanging when the API server is unreachable
+    call insert(args, '--request-timeout=' . resource#config('kube', 'request_timeout'))
   endif
-
-  call add(args, '-f')
-  " Emit only complete lines, as output arrives in arbitrary chunks
-  let pending = {'stdout': '', 'stderr': '', 'callback': a:Callback}
-  return kube#compat#run(s:with_context(a:context, args), {
-        \ 'on_stdout': function('s:line_chunk', [pending, 'stdout']),
-        \ 'on_stderr': function('s:line_chunk', [pending, 'stderr']),
-        \ 'on_exit': function('s:line_flush', [pending]),
-        \ })
-endfunction
-
-function! s:logs_done(Callback, data) abort
-  if a:data isnot v:null
-    call a:Callback(substitute(a:data, '\n$', '', ''))
-  endif
-endfunction
-
-function! s:line_chunk(pending, stream, chunk) abort
-  let a:pending[a:stream] .= a:chunk
-  let last_newline = strridx(a:pending[a:stream], "\n")
-  if last_newline >= 0
-    call a:pending.callback(strpart(a:pending[a:stream], 0, last_newline))
-    let a:pending[a:stream] = strpart(a:pending[a:stream], last_newline + 1)
-  endif
-endfunction
-
-function! s:line_flush(pending, code, stdout, stderr) abort
-  for stream in ['stdout', 'stderr']
-    if a:pending[stream] !=# ''
-      call a:pending.callback(a:pending[stream])
-      let a:pending[stream] = ''
-    endif
-  endfor
+  return s:with_context(a:context, args)
 endfunction
 
 " Forward {local_port} to {port}, {Callback} is called once it exits.

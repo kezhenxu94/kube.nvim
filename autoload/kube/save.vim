@@ -1,136 +1,41 @@
-" What :w does, by kind of buffer. A handler is called with (kbuf, Callback,
-" opts): Callback(saved) tells whether the buffer should be reloaded,
-" opts.force (:w!) skips the confirmations.
+" What :w does, by kind of buffer, see the write() and delete() of resource.vim
+" providers. Lists are resource.vim's: deleted rows delete their resources,
+" cells of editable columns are applied, see kube#edits. The handlers of the
+" other buffers are called with (kbuf, Callback, opts): Callback(saved) tells
+" whether the buffer should be reloaded, opts.force (:w!) skips the
+" confirmations.
 
-function! kube#save#handler(kbuf) abort
+function! kube#save#write(kbuf, force) abort
   if get(a:kbuf.params, 'output', '') is# 'yaml'
-    return function('s:save_yaml')
+    let Save = function('s:save_yaml')
   elseif a:kbuf.subresource_kind ==# 'data'
-    return function('s:save_secret')
+    let Save = function('s:save_secret')
   elseif a:kbuf.subresource_kind ==# 'portforward' || a:kbuf.resource_kind ==# 'portforwards'
-    return function('s:save_portforwards')
-  endif
-  return function('s:save_list')
-endfunction
-
-" ---------------------------------------------------------------------------
-" Lists: delete the resources of deleted rows, apply the edits of cells
-
-function! s:describe_target(resource) abort
-  return printf('%s: %s/%s', kube#utils#resource_type(a:resource), a:resource.metadata.namespace, a:resource.metadata.name)
-endfunction
-
-" The edits of the cells of editable columns: [edits, errors], the errors of
-" the invalid ones and of the other edited cells.
-function! s:cell_edits(kbuf, lines) abort
-  let edits = []
-  let errors = []
-  let editable = get(kube#table#formatter_for(a:kbuf), 'editable', {})
-  let cells = kube#compat#cells(a:kbuf.bufnr)
-  " Marks are created in the order of the cells
-  for id in sort(map(keys(a:kbuf.cells), 'str2nr(v:val)'), 'n')
-    let cell = a:kbuf.cells[id]
-    if cell.item is v:null || cell.row is v:null || get(a:lines, cell.row, 0) == 0 || !has_key(cells, id)
-      continue
-    endif
-    let [lnum, start, end] = cells[id][0:2]
-    let text = trim(strpart(getbufline(a:kbuf.bufnr, lnum)[0], start, end - start))
-    if text ==# cell.text
-      continue
-    endif
-    if !has_key(editable, cell.column)
-      let item = has_key(cell.item, 'metadata') ? kube#utils#resource_type(cell.item) . '/' . cell.item.metadata.name : cell.item.name
-      call add(errors, printf('%s of %s is not editable', cell.column, item))
-      continue
-    endif
-    let [edit, err] = editable[cell.column](a:kbuf, cell.item, cell.text, text)
-    if edit is v:null
-      call add(errors, err)
-    else
-      call add(edits, edit)
-    endif
-  endfor
-  return [edits, errors]
-endfunction
-
-function! s:save_list(kbuf, Callback, opts) abort
-  let lines = kube#table#row_lines(a:kbuf)
-  let [edits, errors] = s:cell_edits(a:kbuf, lines)
-  if !empty(errors)
-    call kube#ui#notify(join(errors, "\n"), 'error')
-    call a:Callback(0)
-    return
-  endif
-
-  let changes = copy(edits)
-  " In the order of the rows
-  for id in sort(map(keys(lines), 'str2nr(v:val)'), 'n')
-    let item = a:kbuf.rows[id].item
-    if lines[id] != 0
-      continue
-    endif
-    " Rows that are not resources, like the containers of a pod, cannot be
-    " deleted, Helm releases are uninstalled
-    if get(item, 'kind', '') ==# 'HelmRelease'
-      call add(changes, {
-            \ 'title': printf('Uninstall helm release %s/%s', item.namespace, item.name),
-            \ 'run': function('helm#cli#uninstall', [a:kbuf.context, item.name, item.namespace]),
-            \ })
-    elseif has_key(item, 'metadata')
-      call add(changes, {
-            \ 'title': 'Delete ' . s:describe_target(item),
-            \ 'run': function('kube#kubectl#delete', [a:kbuf.context, kube#utils#resource_type(item), item.metadata.name,
-            \   kube#utils#get(item.metadata, 'namespace', '')]),
-            \ })
-    endif
-  endfor
-
-  if empty(changes)
-    call a:Callback(1)
-    return
-  endif
-  if a:opts.force
-    call s:run_changes(changes, a:Callback)
-    return
-  endif
-  let titles = map(copy(changes), '"  " . v:val.title')
-  let prompt = printf("Apply the changes (context: %s)?\n%s", a:kbuf.context, join(titles, "\n"))
-  call kube#ui#confirm(prompt, function('s:on_confirm_changes', [changes, a:Callback]))
-endfunction
-
-function! s:on_confirm_changes(changes, Callback, confirmed) abort
-  if a:confirmed
-    call s:run_changes(a:changes, a:Callback)
+    let Save = function('s:save_portforwards')
   else
-    call a:Callback(0)
+    return 0
   endif
+  call Save(a:kbuf, {saved -> saved ? timer_start(0, {-> resource#load(a:kbuf)}) : 0}, {'force': a:force})
+  return 1
 endfunction
 
-" Run the changes and reload once all are done, failed or not, to show what
-" the cluster is now.
-function! s:run_changes(changes, Callback) abort
-  let state = {'remaining': len(a:changes), 'callback': a:Callback}
-  for change in a:changes
-    call change.run(function('s:change_done', [state]), function('s:change_failed', [state, change.title]))
-  endfor
-endfunction
-
-function! s:change_done(state, result) abort
-  if a:result isnot v:null
-    call kube#ui#notify(trim(a:result))
+" The change deleting the item of a deleted row of a list: rows that are not
+" resources, like the containers of a pod, cannot be deleted, Helm releases
+" are uninstalled.
+function! kube#save#delete(kbuf, item) abort
+  if get(a:item, 'kind', '') ==# 'HelmRelease'
+    return {
+          \ 'title': printf('Uninstall helm release %s/%s', a:item.namespace, a:item.name),
+          \ 'run': function('helm#cli#uninstall', [a:kbuf.context, a:item.name, a:item.namespace, v:null, v:null]),
+          \ }
+  elseif has_key(a:item, 'metadata')
+    return {
+          \ 'title': printf('Delete %s: %s/%s', kube#utils#resource_type(a:item), a:item.metadata.namespace, a:item.metadata.name),
+          \ 'run': function('kube#kubectl#delete', [a:kbuf.context, kube#utils#resource_type(a:item), a:item.metadata.name,
+          \   kube#utils#get(a:item.metadata, 'namespace', ''), v:null, v:null]),
+          \ }
   endif
-  call s:change_finished(a:state)
-endfunction
-
-function! s:change_failed(state, title, err) abort
-  call kube#ui#notify(printf("Failed: %s\n%s", a:title, a:err), 'error')
-endfunction
-
-function! s:change_finished(state) abort
-  let a:state.remaining -= 1
-  if a:state.remaining == 0
-    call a:state.callback(1)
-  endif
+  return v:null
 endfunction
 
 " ---------------------------------------------------------------------------
@@ -163,7 +68,7 @@ function! s:save_secret(kbuf, Callback, opts) abort
   let k = a:kbuf
   let [new, err] = kube#secret#from_lines(getbufline(k.bufnr, 1, '$'))
   if new is v:null
-    call kube#ui#notify('Invalid secret data, ' . err, 'error')
+    call resource#notify('Invalid secret data, ' . err, 'error')
     call a:Callback(0)
     return
   endif
@@ -171,7 +76,7 @@ function! s:save_secret(kbuf, Callback, opts) abort
   let old = kube#utils#get(k.data, 'data', {})
   let [patch, changes] = kube#secret#patch(old, new)
   if patch is v:null
-    call kube#ui#notify('No changes to apply')
+    call resource#notify('No changes to apply')
     call a:Callback(1)
     return
   endif
@@ -187,18 +92,18 @@ function! s:save_secret(kbuf, Callback, opts) abort
       call add(summary, change . ' ' . join(changes[change], ', '))
     endif
   endfor
-  call kube#ui#confirm(printf('Update secret %s/%s (context: %s): %s?', k.namespace, k.resource_name, k.context, join(summary, '; ')),
+  call resource#confirm(printf('Update secret %s/%s (context: %s): %s?', k.namespace, k.resource_name, k.context, join(summary, '; ')),
         \ {confirmed -> confirmed ? Update(1) : a:Callback(0)})
 endfunction
 
 function! s:update_secret(kbuf, patch, Callback, confirmed) abort
   call kube#kubectl#patch(a:kbuf.context, 'secret', a:kbuf.resource_name, a:kbuf.namespace, a:patch,
-        \ function('s:secret_updated', [a:Callback]), {err -> kube#ui#notify('Failed to update secret: ' . err, 'error')})
+        \ function('s:secret_updated', [a:Callback]), {err -> resource#notify('Failed to update secret: ' . err, 'error')})
 endfunction
 
 function! s:secret_updated(Callback, result) abort
   if a:result isnot v:null
-    call kube#ui#notify(trim(a:result))
+    call resource#notify(trim(a:result))
   endif
   call a:Callback(a:result isnot v:null)
 endfunction
@@ -207,13 +112,7 @@ endfunction
 " Port forwards: stop those of deleted rows
 
 function! s:save_portforwards(kbuf, Callback, opts) abort
-  let lines = kube#table#row_lines(a:kbuf)
-  let forwards = []
-  for id in sort(map(keys(lines), 'str2nr(v:val)'), 'n')
-    if lines[id] == 0
-      call add(forwards, a:kbuf.rows[id].item)
-    endif
-  endfor
+  let forwards = resource#deleted(a:kbuf)
   if empty(forwards)
     call a:Callback(1)
     return
@@ -222,11 +121,11 @@ function! s:save_portforwards(kbuf, Callback, opts) abort
   if len(forwards) == 1
     let forward = forwards[0]
     let prompt = printf('Delete port forward: %s/%s?', forward.id, forward.local_port)
-    call kube#ui#confirm(prompt, function('s:stop_forwards', [forwards, a:Callback]))
+    call resource#confirm(prompt, function('s:stop_forwards', [forwards, a:Callback]))
     return
   endif
   let choices = ['cancel', 'all'] + forwards
-  call kube#ui#select(choices, {
+  call resource#select(choices, {
         \ 'prompt': "Please select the port forwards to delete:\n",
         \ 'format_item': function('s:format_forward_choice'),
         \ }, function('s:on_forward_choice', [forwards, a:Callback]))
@@ -247,7 +146,7 @@ function! s:on_forward_choice(forwards, Callback, choice, index) abort
   elseif a:choice is# 'all'
     call s:stop_forwards(a:forwards, a:Callback, 1)
   elseif a:choice is# 'cancel'
-    call kube#ui#notify('Deletion cancelled')
+    call resource#notify('Deletion cancelled')
     call a:Callback(0)
   else
     call s:stop_forwards([a:choice], a:Callback, 1)

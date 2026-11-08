@@ -2,11 +2,15 @@
 " kube://.../pod/{name}/debug (params: image, target), started by BufReadCmd
 " from their name, like term:// buffers.
 
-function! kube#exec#start(name, parts) abort
+" The command of the terminal of {parts} (see kube#provider#parse()), v:null
+" if it is not one, [] when it is invalid.
+function! kube#exec#term(parts) abort
   let params = a:parts.params
-  if empty(a:parts.resource_name)
-    call kube#ui#notify('Expected: kube://context/{context}/[namespaces/{ns}/]{kind}/{name}/' . a:parts.subresource_kind, 'error')
-    return
+  if a:parts.subresource_kind !=# 'exec' && a:parts.subresource_kind !=# 'debug'
+    return v:null
+  elseif empty(a:parts.resource_name)
+    call resource#notify('Expected: kube://context/{context}/[namespaces/{ns}/]{kind}/{name}/' . a:parts.subresource_kind, 'error')
+    return []
   elseif a:parts.subresource_kind ==# 'exec'
     let cmd = kube#kubectl#exec_cmd(a:parts.context, a:parts.resource_kind, a:parts.resource_name, a:parts.namespace,
           \ get(params, 'container', ''))
@@ -14,16 +18,15 @@ function! kube#exec#start(name, parts) abort
     let cmd = kube#kubectl#debug_cmd(a:parts.context, a:parts.resource_name, a:parts.namespace, params.image,
           \ get(params, 'target', ''))
   else
-    call kube#ui#notify('Expected the image of the debug container: ?image={image}', 'error')
-    return
+    call resource#notify('Expected the image of the debug container: ?image={image}', 'error')
+    return []
   endif
-  call kube#compat#term_start(cmd, a:name)
+  return cmd
 endfunction
 
 " Edit the shell buffer, started by BufReadCmd unless it already exists.
 function! s:open_terminal(opts) abort
   call kube#utils#open(a:opts)
-  call kube#compat#term_enter()
 endfunction
 
 " Call {OnChoice}(container) with the selected container, the only one
@@ -33,7 +36,7 @@ function! s:select_container(containers, prompt, OnChoice) abort
     call a:OnChoice(get(a:containers, 0, {}))
     return
   endif
-  call kube#ui#select(a:containers, {'prompt': a:prompt, 'format_item': {item -> item.name}},
+  call resource#select(a:containers, {'prompt': a:prompt, 'format_item': {item -> item.name}},
         \ {choice, index -> choice is v:null ? 0 : a:OnChoice(choice)})
 endfunction
 
@@ -53,7 +56,7 @@ endfunction
 " Open a shell in an ephemeral debug container of {pod}, sharing the process
 " namespace of a container.
 function! kube#exec#prompt_debug(context, pod) abort
-  call kube#ui#input({'prompt': 'Debug image: ', 'default': 'busybox'}, function('s:on_image', [a:context, a:pod]))
+  call resource#input({'prompt': 'Debug image: ', 'default': 'busybox'}, function('s:on_image', [a:context, a:pod]))
 endfunction
 
 function! s:on_image(context, pod, image) abort

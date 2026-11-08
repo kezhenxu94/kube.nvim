@@ -1,6 +1,6 @@
 " Parse a buffer name without loading it.
 function! s:parse(name) abort
-  let parsed = kube#buffer#parse_name(a:name)
+  let parsed = kube#provider#parse(a:name)
   return filter(parsed, '!empty(v:val)')
 endfunction
 
@@ -48,7 +48,7 @@ call t#it('converts flag params to booleans and keeps values with =', function('
 
 function! s:fails(name) abort
   try
-    call kube#buffer#parse_name(a:name)
+    call kube#provider#parse(a:name)
     return 0
   catch /^Invalid buffer name/
     return 1
@@ -64,12 +64,16 @@ endfunction
 call t#it('rejects names without a context or kind', function('s:test_rejects'))
 
 function! s:test_same_instance() abort
-  enew
-  file kube://context/c/pods
+  call t#reset_kubectl()
+  call t#respond('*get pods*', {'stdout': '{"items": []}'})
   try
-    call assert_true(kube#buffer#new(bufnr('')) is kube#buffer#new(bufnr('')))
+    call t#open('kube://context/c/pods')
+    let kbuf = t#kbuf()
+    edit
+    call t#wait_loaded()
+    call assert_true(t#kbuf() is kbuf)
   finally
-    silent! %bwipeout!
+    call t#clean_buffers()
   endtry
 endfunction
 call t#it('returns the same instance for the same buffer', function('s:test_same_instance'))
@@ -84,7 +88,7 @@ endfunction
 call t#before_each(function('s:before_canonical'))
 
 function! s:canonical(name) abort
-  return kube#autocmds#canonical_name(a:name)[0]
+  return kube#provider#canonical(a:name)
 endfunction
 
 function! s:test_pins() abort

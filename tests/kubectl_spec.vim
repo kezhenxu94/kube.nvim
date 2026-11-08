@@ -170,8 +170,8 @@ call t#describe('kubectl logs')
 
 function! s:logs(opts, ...) abort
   let state = {'chunks': []}
-  let job = call('kube#kubectl#logs', (a:0 ? a:000 : ['ctx', 'pod', 'web-1', 'ns1']) + [a:opts, {data -> add(state.chunks, data)}])
-  let state.job = job
+  let cmd = call('kube#kubectl#logs_cmd', (a:0 ? a:000 : ['ctx', 'pod', 'web-1', 'ns1']) + [a:opts])
+  let state.job = resource#job(cmd, {'on_exit': {code, out, err -> add(state.chunks, out . err)}})
   return state
 endfunction
 
@@ -179,10 +179,11 @@ function! s:test_logs_whole() abort
   call t#respond('*logs*', {'stdout': "line1\nline2\n"})
   let state = s:logs({'container': 'app'})
   call t#wait_for({-> !empty(state.chunks)}, 'logs')
-  call assert_equal(["line1\nline2"], state.chunks)
+  call assert_equal(["line1\nline2\n"], state.chunks)
   call assert_equal(['--context ctx logs pod/web-1 -c app -n ns1 --tail=1000'], t#calls())
+  call assert_match('^--request-timeout=30s ', t#calls(1)[0][len('--context ctx '):])
 endfunction
-call t#it('returns the whole output without the trailing newline', function('s:test_logs_whole'))
+call t#it('runs with the request timeout', function('s:test_logs_whole'))
 
 function! s:test_logs_options() abort
   call t#respond('*logs*', {'stdout': 'x'})
@@ -194,38 +195,34 @@ call t#it('passes previous, all containers, since and tail', function('s:test_lo
 
 function! s:test_logs_errors() abort
   call t#respond('*logs*', {'stderr': 'container not found', 'code': 1})
-  let state = s:logs({})
-  call t#wait_for({-> !empty(state.chunks)}, 'logs')
-  call assert_equal(['container not found'], state.chunks)
+  try
+    call t#open('kube://context/ctx/namespaces/ns1/pod/web-1/logs')
+    call assert_equal(['container not found'], t#lines())
+  finally
+    call t#clean_buffers()
+  endtry
 endfunction
 call t#it('shows errors in place of the logs', function('s:test_logs_errors'))
 
 function! s:test_logs_stream() abort
-  call t#respond('*logs*', {'script': "printf 'a\\nb'; sleep 0.2; printf 'c\\nd\\n'"})
+  call t#respond('*logs*', {'stdout': 'x'})
   let state = s:logs({'follow': 1})
-  call t#wait_for({-> !kube#compat#running(state.job) && len(state.chunks) == 2}, 'log chunks')
-  call assert_equal(['a', "bc\nd"], state.chunks)
+  call t#wait_for({-> !empty(state.chunks)}, 'logs')
   call assert_equal(['--context ctx logs pod/web-1 -n ns1 --tail=1000 -f'], t#calls())
+  " Without the request timeout
+  call assert_equal(t#calls(), t#calls(1))
 endfunction
-call t#it('streams complete lines when following', function('s:test_logs_stream'))
-
-function! s:test_logs_flush() abort
-  call t#respond('*logs*', {'script': "printf 'a\\nb'"})
-  let state = s:logs({'follow': 1})
-  call t#wait_for({-> len(state.chunks) == 2}, 'log chunks')
-  call assert_equal(['a', 'b'], state.chunks)
-endfunction
-call t#it('flushes a final partial line when the stream ends', function('s:test_logs_flush'))
+call t#it('follows without the request timeout', function('s:test_logs_stream'))
 
 call t#describe('kubectl kill')
 
 function! s:test_kill() abort
   call t#respond('*', {'script': 'sleep 30'})
   let job = kube#kubectl#describe('ctx', 'pod', 'web', 'ns1', {data -> 0}, v:null)
-  call kube#compat#kill(job)
-  call t#wait_for({-> !kube#compat#running(job)}, 'job to exit')
-  call kube#compat#kill(job)
-  call kube#compat#kill({})
+  call resource#kill(job)
+  call t#wait_for({-> !resource#running(job)}, 'job to exit')
+  call resource#kill(job)
+  call resource#kill({})
 endfunction
 call t#it('kills running jobs and ignores finished ones', function('s:test_kill'))
 
@@ -268,7 +265,7 @@ endfunction
 call t#it('persists the switched context', function('s:test_persists'))
 
 function! s:test_corrupt_state() abort
-  call writefile(['{not json'], kube#compat#state_file('kube_state.json'))
+  call writefile(['{not json'], resource#state_dir() . '/kube_state.json')
   call kube#kubectl#set_context(v:null)
   runtime autoload/kube/kubectl.vim
   call assert_equal(v:null, kube#kubectl#context())

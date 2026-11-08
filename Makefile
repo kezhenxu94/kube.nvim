@@ -1,6 +1,8 @@
 VIM ?= vim
 NVIM ?= nvim
 SPECS ?= $(wildcard tests/*_spec.vim)
+# The checkout of https://github.com/kezhenxu94/resource.vim
+RESOURCE_VIM ?= ../resource.vim
 
 .PHONY: test test-vim test-nvim
 
@@ -10,7 +12,7 @@ test: test-vim test-nvim
 define run_specs
 	@failed=0; for spec in $(2); do \
 		tmp=$$(mktemp -d); \
-		XDG_STATE_HOME=$$tmp/state XDG_DATA_HOME=$$tmp/data XDG_CONFIG_HOME=$$tmp/config KUBECONFIG=$$tmp/kubeconfig TZ=UTC $(3) KUBE_TEST_RESULT=$$tmp/result KUBE_TEST_OUT=$$tmp/out \
+		XDG_STATE_HOME=$$tmp/state XDG_DATA_HOME=$$tmp/data XDG_CONFIG_HOME=$$tmp/config KUBECONFIG=$$tmp/kubeconfig TZ=UTC RESOURCE_VIM=$(RESOURCE_VIM) $(3) KUBE_TEST_RESULT=$$tmp/result KUBE_TEST_OUT=$$tmp/out \
 			$(1) --cmd "let g:spec = '$$spec'" -S tests/runner.vim < /dev/null > /dev/null; \
 		cat $$tmp/out 2>/dev/null; test -f $$tmp/result || failed=1; \
 		rm -rf $$tmp; \

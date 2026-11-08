@@ -20,7 +20,9 @@ YAML, logs, events, decoded secrets and Helm releases. Delete a line and |:w|
 to delete a resource, edit the YAML and |:w| to apply it.
 
 Requirements: Vim >= 9.2 or Neovim >= 0.11, and `kubectl` in $PATH. `helm` in
-$PATH for Helm releases, see |kube-helm|.
+$PATH for Helm releases, see |kube-helm|. And resource.vim, the core shared
+with docker.nvim: https://github.com/kezhenxu94/resource.vim, see
+|resource.vim|.
 
 There is nothing to set up, the |:Kube| command and the `kube://` buffers work
 as soon as the plugin is installed, see |kube-config| to change the defaults.
@@ -104,7 +106,7 @@ Views of a resource ({sub} and {params}):
 Lists take kubectl flags as params, e.g. `?selector=app=web` or
 `?field-selector=involvedObject.name=web`.
 
-Lists have a header: in the winbar in Neovim, above the first line in Vim.
+Lists have a header: in the winbar in Neovim, in the |WinBar| menu in Vim.
 Unhealthy resources (failing pods, not ready nodes, warning events, failed
 Helm releases, ...) have a sign, see |kube-keymaps| for |]d| and |CTRL-W_d|.
 
@@ -141,7 +143,7 @@ They can be changed with |g:kube_keymaps|.
     gs      Shell (`kubectl exec`)
     gra     Operations on the resource under the cursor, or on the resources
             of a visual selection, see |kube-operations|
-    ]d [d   Next / previous unhealthy resource
+    ]d [d   Next / previous unhealthy resource, wrapping around
     CTRL-W d
             Show why the resource of the cursor line is unhealthy
     g?      Help

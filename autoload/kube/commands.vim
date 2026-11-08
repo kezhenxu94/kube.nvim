@@ -31,7 +31,7 @@ function! kube#commands#run(args, bang) abort
   let args = split(a:args, ' ')
   let command = empty(args) ? '' : remove(args, 0)
   if index(s:COMMANDS, command) < 0
-    call kube#ui#notify('No such command: ' . command, 'error')
+    call resource#notify('No such command: ' . command, 'error')
     return
   endif
   call call(function('s:' . command), kube#commands#parse(command, args, a:bang))
@@ -87,14 +87,14 @@ function! s:delete(kind, name, params) abort
   let context = kube#kubectl#get_current_context()
   let namespace = get(a:params, 'namespace', 'default')
   let target = printf('%s: %s/%s (context: %s)', a:kind, namespace, a:name, context)
-  call kube#ui#confirm(printf('Delete %s?', target), function('s:on_delete', [context, a:kind, a:name, namespace, target]))
+  call resource#confirm(printf('Delete %s?', target), function('s:on_delete', [context, a:kind, a:name, namespace, target]))
 endfunction
 
 function! s:on_delete(context, kind, name, namespace, target, confirmed) abort
   if a:confirmed
     call kube#kubectl#delete(a:context, a:kind, a:name, a:namespace,
-          \ {result -> result is v:null ? 0 : kube#ui#notify('Deleted ' . a:target)},
-          \ {err -> kube#ui#notify(printf("Failed to delete %s: \n%s", a:target, err), 'error')})
+          \ {result -> result is v:null ? 0 : resource#notify('Deleted ' . a:target)},
+          \ {err -> resource#notify(printf("Failed to delete %s: \n%s", a:target, err), 'error')})
   endif
 endfunction
 
@@ -108,23 +108,23 @@ function! s:context(context) abort
 endfunction
 
 function! s:use_context(context) abort
-  call kube#kubectl#use_context(a:context, {result -> kube#ui#notify('Switched to context: ' . a:context)})
+  call kube#kubectl#use_context(a:context, {result -> resource#notify('Switched to context: ' . a:context)})
 endfunction
 
 function! s:on_config(result) abort
   if a:result is v:null
-    call kube#ui#notify('No config found', 'error')
+    call resource#notify('No config found', 'error')
     return
   endif
   let config = json_decode(a:result)
   let contexts = kube#utils#list(config, 'contexts')
   if empty(contexts)
-    call kube#ui#notify('No contexts found', 'error')
+    call resource#notify('No contexts found', 'error')
     return
   endif
   let current = kube#kubectl#context()
   let current = type(current) == v:t_string ? current : kube#utils#get(config, 'current-context', '')
-  call kube#ui#select(contexts, {
+  call resource#select(contexts, {
         \ 'prompt': printf('Select context (current: %s)', current),
         \ 'format_item': {item -> (item.name ==# current ? '* ' : '  ') . item.name},
         \ }, {choice, index -> choice is v:null ? 0 : s:use_context(choice.name)})
@@ -148,7 +148,7 @@ endfunction
 
 function! s:on_diff_file(context, file, Cleanup) abort
   call kube#kubectl#diff(a:context, v:null, a:file, function('s:show_diff', [a:Cleanup]),
-        \ {err -> kube#ui#notify('Failed to diff: ' . err, 'error')})
+        \ {err -> resource#notify('Failed to diff: ' . err, 'error')})
 endfunction
 
 function! s:show_diff(Cleanup, diff) abort
@@ -156,7 +156,7 @@ function! s:show_diff(Cleanup, diff) abort
   if a:diff is v:null
     return
   elseif empty(a:diff)
-    call kube#ui#notify('No changes')
+    call resource#notify('No changes')
   else
     call kube#apply#show_split(split(trim(a:diff), "\n"), 'diff')
   endif

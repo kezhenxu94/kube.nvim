@@ -104,10 +104,13 @@ endfunction
 
 " Answer the prompts: {Select}(items, opts) returns the chosen item (v:null
 " to cancel), {input} is the answer to inputs.
-" Stubs replace functions of autoload/kube/ui.vim, loaded first so that it
-" does not replace them later.
+" Stubs replace functions of autoload/resource.vim and autoload/kube/ui.vim,
+" loaded first so that they do not replace them later.
 function! s:load_ui() abort
-  if !exists('*kube#ui#confirm')
+  if !exists('*resource#confirm')
+    runtime autoload/resource.vim
+  endif
+  if !exists('*kube#ui#open')
     runtime autoload/kube/ui.vim
   endif
 endfunction
@@ -116,7 +119,7 @@ function! t#answer_prompts(Select, input) abort
   call s:load_ui()
   let g:T_select = a:Select
   let g:t_input = a:input
-  function! kube#ui#select(items, opts, Callback) abort
+  function! resource#select(items, opts, Callback) abort
     let choice = g:T_select is v:null ? v:null : g:T_select(a:items, a:opts)
     let index = 0
     for i in range(len(a:items))
@@ -126,7 +129,7 @@ function! t#answer_prompts(Select, input) abort
     endfor
     call a:Callback(index ? choice : v:null, index ? index : v:null)
   endfunction
-  function! kube#ui#input(opts, Callback) abort
+  function! resource#input(opts, Callback) abort
     call a:Callback(g:t_input)
   endfunction
 endfunction
@@ -135,7 +138,7 @@ endfunction
 function! t#capture_notify() abort
   call s:load_ui()
   let g:t_messages = []
-  function! kube#ui#notify(msg, ...) abort
+  function! resource#notify(msg, ...) abort
     call add(g:t_messages, {'msg': a:msg, 'level': get(a:, 1, 'info')})
   endfunction
   return g:t_messages
@@ -152,13 +155,14 @@ endfunction
 
 " Restore the stubbed prompts, notifications and opener.
 function! t#restore_stubs() abort
+  runtime autoload/resource.vim
   runtime autoload/kube/ui.vim
 endfunction
 
 " Kill the kube jobs and wipe every buffer, leaving an empty one.
 function! t#clean_buffers() abort
   silent! %bwipeout!
-  call t#wait_for({-> empty(kube#buffer#all())}, 'kube buffers to be cleaned up')
+  call t#wait_for({-> empty(resource#buffers())}, 'kube buffers to be cleaned up')
 endfunction
 
 function! t#lines(...) abort
@@ -167,19 +171,18 @@ endfunction
 
 " The status shown after a line, v:null if none.
 function! t#status(...) abort
-  let status = kube#compat#status(get(a:, 1, bufnr('')))
+  let status = resource#compat#status(get(a:, 1, bufnr('')))
   return empty(status) ? v:null : status[1]
 endfunction
 
 function! t#kbuf() abort
-  return kube#buffer#get(bufnr(''))
+  return resource#get(bufnr(''))
 endfunction
 
 " Wait for the current kube buffer to finish loading.
 function! t#wait_loaded(...) abort
   let buf = bufnr('')
-  call t#wait_for({-> !empty(kube#buffer#get(buf)) && !kube#compat#running(kube#buffer#get(buf).loading_job)},
-        \ 'buffer to load', get(a:, 1, 5000))
+  call t#wait_for({-> !empty(resource#get(buf)) && !resource#loading(buf)}, 'buffer to load', get(a:, 1, 5000))
   " Let the timers of the render run
   sleep 20m
 endfunction
@@ -231,7 +234,7 @@ endfunction
 function! t#operation(title, ...) abort
   let kbuf = t#kbuf()
   let [first, last] = a:0 ? [a:1, a:2] : [line('.'), line('.')]
-  let operations = kube#operations#for_items(kbuf, kube#table#items_in_rows(kbuf, first, last))
+  let operations = kube#operations#for_items(kbuf, resource#items(kbuf, first, last))
   let titles = map(copy(operations), 'v:val.title')
   call assert_notequal(-1, index(titles, a:title), a:title . ' not in ' . string(titles))
   for operation in operations
@@ -249,7 +252,7 @@ function! t#wait_float(text) abort
 endfunction
 
 function! s:float_with(text) abort
-  for [win, lines] in kube#compat#floats()
+  for [win, lines] in resource#compat#floats()
     if stridx(join(lines, "\n"), a:text) >= 0
       return win
     endif
@@ -259,10 +262,9 @@ endfunction
 
 " The diagnostics of the current buffer: [[lnum, severity, message]].
 function! t#diagnostics() abort
-  let kbuf = t#kbuf()
   let result = []
-  for lnum in kube#table#diagnostic_lines(kbuf)
-    for diagnostic in kube#table#diagnostics(kbuf, lnum)
+  for lnum in resource#table#diagnostic_lines(bufnr(''))
+    for diagnostic in resource#table#diagnostics(bufnr(''), lnum)
       call add(result, [lnum, diagnostic.severity, diagnostic.message])
     endfor
   endfor

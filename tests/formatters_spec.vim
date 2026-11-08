@@ -189,28 +189,27 @@ call t#it("lists the forwards of the resource in the buffer's context only", fun
 call t#describe('format_table')
 
 function! s:test_align() abort
-  let [header, formatted, widths] = kube#table#format_table(['NAME', 'AGE'],
+  let [header, formatted] = resource#table#format(['NAME', 'AGE'],
         \ [{'row': ['a-long-name', '1d'], 'item': {}}, {'row': ['b', '10d'], 'item': {}}])
-  call assert_equal([11, 3], widths)
-  call assert_equal('NAME         AGE', header.formatted)
+  call assert_equal('NAME         AGE', header)
   call assert_equal('a-long-name  1d ', formatted[0].formatted)
   call assert_equal('b            10d', formatted[1].formatted)
 endfunction
 call t#it('aligns columns to the widest value', function('s:test_align'))
 
 function! s:test_truncate() abort
-  call assert_equal(repeat('x', 96) . '...', kube#table#align_row([repeat('x', 120)], [120])[0])
+  call assert_equal(repeat('x', 96) . '...', resource#table#format(['X'], [{'row': [repeat('x', 120)]}])[1][0].formatted)
 endfunction
 call t#it('truncates columns wider than 99', function('s:test_truncate'))
 
 call t#describe('format_table with wide characters')
 
 function! s:test_wide() abort
-  let formatted = kube#table#format_table(['NAME', 'AGE'],
+  let formatted = resource#table#format(['NAME', 'AGE'],
         \ [{'row': ['中文', '1d'], 'item': {}}, {'row': ['abcde', '2d'], 'item': {}}])[1]
   call assert_equal('中文   1d ', formatted[0].formatted)
   call assert_equal('abcde  2d ', formatted[1].formatted)
   call assert_equal([[0, 7], [9, 12]], formatted[0].ranges)
-  call assert_equal(repeat('中', 48) . '...', kube#table#align_row([repeat('中', 60)], [120])[0])
+  call assert_equal(repeat('中', 48) . '...', resource#table#format(['X'], [{'row': [repeat('中', 60)]}])[1][0].formatted)
 endfunction
 call t#it('aligns and truncates by display width', function('s:test_wide'))

@@ -11,40 +11,19 @@ function! s:op(title, Run) abort
   return {'title': a:title, 'run': a:Run}
 endfunction
 
-function! s:describe_targets(resources) abort
-  let names = map(copy(a:resources), 'kube#utils#resource_type(v:val) . "/" . v:val.metadata.name')
-  if len(names) > 3
-    return printf('%s and %d more', join(names[0:2], ', '), len(names) - 3)
-  endif
-  return join(names, ', ')
-endfunction
-
-" Run {Call}(item, Callback, OnError) for every item, then reload the buffer.
+" Run {Call}(item) for every item, it returns the job of the item, then
+" reload the buffer.
 function! s:run_all(kbuf, items, Call) abort
-  let state = {'remaining': len(a:items)}
-  for item in a:items
-    call a:Call(item, function('s:done', [a:kbuf, state]), {err -> kube#ui#notify(err, 'error')})
-  endfor
-endfunction
-
-function! s:done(kbuf, state, result) abort
-  if a:result isnot v:null
-    call kube#ui#notify(trim(a:result))
-  endif
-  let a:state.remaining -= 1
-  if a:state.remaining == 0
-    call kube#buffer#load(a:kbuf)
-  endif
+  call resource#run(a:kbuf, a:items, a:Call)
 endfunction
 
 " Run {Call} on all {items} once confirmed, the prompt is {verb} {targets}.
 function! s:confirmed(kbuf, items, verb, targets, Call) abort
-  call kube#ui#confirm(printf('%s %s (context: %s)?', a:verb, a:targets, a:kbuf.context),
-        \ {yes -> yes ? s:run_all(a:kbuf, a:items, a:Call) : 0})
+  call resource#run(a:kbuf, a:items, a:Call, a:verb . ' ' . a:targets)
 endfunction
 
 function! s:confirmed_resources(kbuf, resources, verb, Call) abort
-  call s:confirmed(a:kbuf, a:resources, a:verb, s:describe_targets(a:resources), a:Call)
+  call s:confirmed(a:kbuf, a:resources, a:verb, resource#describe(a:kbuf, a:resources), a:Call)
 endfunction
 
 function! s:args(resource) abort
@@ -86,7 +65,7 @@ function! s:stop_forwards(kbuf, forwards, yes) abort
   for forward in a:forwards
     call kube#portforward#stop(forward.id, forward.local_port)
   endfor
-  call kube#buffer#load(a:kbuf)
+  call resource#load(a:kbuf)
 endfunction
 
 " Operations on port forward rows, of a resource or of kube://portforwards.
@@ -106,18 +85,18 @@ function! s:portforward_operations(kbuf, forwards) abort
   endif
   let ports = join(map(copy(a:forwards), 'v:val.local_port'), ', ')
   let title = len(a:forwards) == 1 ? 'Stop' : printf('Stop %d port forwards', len(a:forwards))
-  call add(operations, s:op(title, {-> kube#ui#confirm(printf('Stop the port forwards of local ports %s?', ports),
+  call add(operations, s:op(title, {-> resource#confirm(printf('Stop the port forwards of local ports %s?', ports),
         \ function('s:stop_forwards', [a:kbuf, a:forwards]))}))
   return operations
 endfunction
 
-function! s:rollback(kbuf, revision, item, Callback, OnError) abort
+function! s:rollback(kbuf, revision, item) abort
   let release = get(a:item, 'release', a:item.name)
-  call helm#cli#rollback(a:kbuf.context, release, a:item.namespace, a:revision, a:Callback, a:OnError)
+  return helm#cli#rollback(a:kbuf.context, release, a:item.namespace, a:revision, v:null, v:null)
 endfunction
 
-function! s:uninstall(kbuf, release, Callback, OnError) abort
-  call helm#cli#uninstall(a:kbuf.context, a:release.name, a:release.namespace, a:Callback, a:OnError)
+function! s:uninstall(kbuf, release) abort
+  return helm#cli#uninstall(a:kbuf.context, a:release.name, a:release.namespace, v:null, v:null)
 endfunction
 
 " Operations on Helm releases, rows of helm-releases, or on the revisions of
@@ -175,7 +154,7 @@ function! s:show_events(kbuf, resource) abort
 endfunction
 
 function! s:logs_since(kbuf, resource) abort
-  call kube#ui#input({'prompt': 'Since (e.g. 30s, 5m, 1h): ', 'default': '1h'},
+  call resource#input({'prompt': 'Since (e.g. 30s, 5m, 1h): ', 'default': '1h'},
         \ {since -> since is v:null ? 0 : kube#actions#open_resource(a:kbuf, a:resource, 'logs', {'since': since})})
 endfunction
 
@@ -183,12 +162,12 @@ function! s:trigger(kbuf, resource) abort
   " Job names are at most 63 characters, as they are label values
   let job = printf('%s-manual-%d', a:resource.metadata.name[0:44], localtime())
   call s:confirmed_resources(a:kbuf, [a:resource], 'Trigger',
-        \ {r, Callback, OnError -> kube#kubectl#create_job(a:kbuf.context, r.metadata.name, r.metadata.namespace, job, Callback, OnError)})
+        \ {r -> kube#kubectl#create_job(a:kbuf.context, r.metadata.name, r.metadata.namespace, job, v:null, v:null)})
 endfunction
 
 function! s:undo(kbuf, resource) abort
   call s:confirmed_resources(a:kbuf, [a:resource], 'Undo the rollout of',
-        \ {r, Callback, OnError -> call('kube#kubectl#rollout', [a:kbuf.context, 'undo'] + s:args(r) + [Callback, OnError])})
+        \ {r -> call('kube#kubectl#rollout', [a:kbuf.context, 'undo'] + s:args(r) + [v:null, v:null])})
 endfunction
 
 function! s:single_operations(kbuf, resource) abort
@@ -245,23 +224,23 @@ endfunction
 
 function! s:scale(kbuf, resources) abort
   let current = kube#utils#dig(a:resources[0], 'spec.replicas', 1)
-  call kube#ui#input({'prompt': 'Replicas: ', 'default': string(current)}, function('s:on_replicas', [a:kbuf, a:resources]))
+  call resource#input({'prompt': 'Replicas: ', 'default': string(current)}, function('s:on_replicas', [a:kbuf, a:resources]))
 endfunction
 
 function! s:on_replicas(kbuf, resources, input) abort
   let replicas = kube#edits#parse_replicas(a:input)
   if replicas < 0
     if a:input isnot v:null
-      call kube#ui#notify('Invalid number of replicas: ' . a:input, 'error')
+      call resource#notify('Invalid number of replicas: ' . a:input, 'error')
     endif
     return
   endif
   call s:run_all(a:kbuf, a:resources,
-        \ {r, Callback, OnError -> call('kube#kubectl#scale', [a:kbuf.context] + s:args(r) + [replicas, Callback, OnError])})
+        \ {r -> call('kube#kubectl#scale', [a:kbuf.context] + s:args(r) + [replicas, v:null, v:null])})
 endfunction
 
 function! s:node(kbuf, resources, verb) abort
-  let Call = {r, Callback, OnError -> kube#kubectl#node(a:kbuf.context, a:verb, r.metadata.name, Callback, OnError)}
+  let Call = {r -> kube#kubectl#node(a:kbuf.context, a:verb, r.metadata.name, v:null, v:null)}
   if a:verb ==# 'drain'
     call s:confirmed_resources(a:kbuf, a:resources, 'Drain', Call)
   else
@@ -278,7 +257,7 @@ function! s:bulk_operations(kbuf, resources) abort
   endif
   if s:all(a:resources, s:ROLLOUT)
     call add(operations, s:op('Restart', function('s:confirmed_resources', [k, a:resources, 'Restart',
-          \ {r, Callback, OnError -> call('kube#kubectl#rollout', [k.context, 'restart'] + s:args(r) + [Callback, OnError])}])))
+          \ {r -> call('kube#kubectl#rollout', [k.context, 'restart'] + s:args(r) + [v:null, v:null])}])))
   endif
   if s:all(a:resources, ['Node'])
     for verb in ['cordon', 'uncordon', 'drain']
@@ -286,7 +265,7 @@ function! s:bulk_operations(kbuf, resources) abort
     endfor
   endif
   call add(operations, s:op('Delete', function('s:confirmed_resources', [k, a:resources, 'Delete',
-        \ {r, Callback, OnError -> call('kube#kubectl#delete', [k.context] + s:args(r) + [Callback, OnError])}])))
+        \ {r -> call('kube#kubectl#delete', [k.context] + s:args(r) + [v:null, v:null])}])))
   return operations
 endfunction
 
@@ -314,15 +293,4 @@ function! kube#operations#for_items(kbuf, items) abort
   endif
   " Name the targets of bulk operations
   return map(s:bulk_operations(k, resources), 'extend(v:val, {"title": printf("%s %d resources", substitute(v:val.title, "…$", "", ""), len(resources))})')
-endfunction
-
-" Select an operation on the rows of the lines {first} to {last} and run it.
-function! kube#operations#select(kbuf, first, last) abort
-  let operations = kube#operations#for_items(a:kbuf, kube#table#items_in_rows(a:kbuf, a:first, a:last))
-  if empty(operations)
-    call kube#ui#notify('No operations', 'warn')
-    return
-  endif
-  call kube#ui#select(map(copy(operations), 'v:val.title'), {'prompt': 'Operations:'},
-        \ {choice, index -> choice is v:null ? 0 : operations[index - 1].run()})
 endfunction

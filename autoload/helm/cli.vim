@@ -4,7 +4,7 @@
 " g:kube_request_timeout in milliseconds, helm has no --request-timeout.
 " 0 for no timeout.
 function! s:timeout_ms() abort
-  let timeout = kube#config#get('request_timeout')
+  let timeout = resource#config('kube', 'request_timeout')
   if type(timeout) == v:t_number || timeout =~# '^\d\+$'
     return str2nr(timeout) * 1000
   endif
@@ -34,7 +34,7 @@ function! s:helm(context, namespace, args, Callback, OnError, ...) abort
   if !get(a:, 1, 0) && timeout > 0
     let opts.timeout = timeout
   endif
-  return kube#compat#run(cmd, opts)
+  return resource#job(cmd, opts)
 endfunction
 
 function! s:on_exit(Callback, OnError, code, stdout, stderr) abort
@@ -76,7 +76,7 @@ function! helm#cli#get(context, what, name, namespace, opts, Callback, OnError) 
     endif
   endif
   if get(a:opts, 'revision', v:null) isnot v:null
-    call add(args, '--revision=' . kube#utils#to_string(a:opts.revision))
+    call add(args, '--revision=' . resource#to_string(a:opts.revision))
   endif
   return s:helm(a:context, a:namespace, args, a:Callback, a:OnError)
 endfunction
@@ -90,7 +90,7 @@ endfunction
 function! helm#cli#rollback(context, name, namespace, revision, Callback, OnError) abort
   let args = ['rollback', a:name]
   if a:revision isnot v:null
-    call add(args, kube#utils#to_string(a:revision))
+    call add(args, resource#to_string(a:revision))
   endif
   return s:helm(a:context, a:namespace, args, a:Callback, a:OnError, 1)
 endfunction

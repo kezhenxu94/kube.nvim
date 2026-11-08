@@ -77,7 +77,7 @@ function! s:test_missing_context() abort
   call t#respond('*config current-context*', {'stderr': 'error: current-context is not set', 'code': 1})
   edit kube://pods
   call assert_equal('No current kubectl context', messages[0].msg)
-  call assert_equal({}, kube#buffer#get(bufnr('')))
+  call assert_equal({}, resource#get(bufnr('')))
 endfunction
 call t#it('reports a missing current context', function('s:test_missing_context'))
 
@@ -182,7 +182,7 @@ function! s:test_line_without_resource() abort
   normal! Go
   call t#press("\<Esc>K")
   call assert_equal(s:PODS, bufname(''))
-  call assert_equal([], kube#compat#floats())
+  call assert_equal([], resource#compat#floats())
 endfunction
 call t#it('ignores lines without a resource', function('s:test_line_without_resource'))
 
@@ -214,7 +214,7 @@ function! s:test_describe() abort
   call t#press_on('web', 'K')
   let float = t#wait_float('Name: web')
   call assert_equal(['--context ctx-a describe deployment.apps web -n ns1'], t#calls_matching('describe'))
-  call kube#compat#close_float(float)
+  call resource#compat#close_float(float)
 endfunction
 call t#it('K describes in a float with the group-qualified type', function('s:test_describe'))
 
@@ -323,9 +323,9 @@ function! s:test_follow_logs() abort
   call assert_equal(['a', 'b', ''], t#lines())
   call assert_match('Waiting for new logs', t#status())
 
-  let job = t#kbuf().loading_job
+  let job = t#kbuf().follow_job
   call t#press("\<C-c>")
-  call t#wait_for({-> !kube#compat#running(job)}, 'logs job to stop')
+  call t#wait_for({-> !resource#running(job)}, 'logs job to stop')
   call assert_match('Stopped following logs', t#status())
 endfunction
 call t#it('follows logs and stops on <C-c>', function('s:test_follow_logs'))
@@ -417,7 +417,7 @@ function! s:test_help() abort
   else
     call feedkeys('q', 'xt')
   endif
-  call assert_equal([], kube#compat#floats())
+  call assert_equal([], resource#compat#floats())
 endfunction
 call t#it('shows the help with the configured keymaps', function('s:test_help'))
 
@@ -476,7 +476,7 @@ function! s:test_explain() abort
   call t#press_on('deployments', 'K')
   let float = t#wait_float('KIND:       Deployment')
   call assert_equal(['--context ctx-a explain deployments.apps'], t#calls_matching('explain'))
-  call kube#compat#close_float(float)
+  call resource#compat#close_float(float)
 endfunction
 call t#it('K explains the resource type in a float', function('s:test_explain'))
 
@@ -567,10 +567,11 @@ function! s:test_exact_columns() abort
   let kbuf = t#kbuf()
   let node_col = stridx(getline(1), 'node-1')
   let definition = 'kube://context/ctx-a/namespaces/ns1/pod/web-1?output=yaml'
-  call assert_equal('kube://context/ctx-a/node/node-1', kube#navigation#tag_target(kbuf, 1, node_col), 'first char of NODE')
-  call assert_equal('kube://context/ctx-a/node/node-1', kube#navigation#tag_target(kbuf, 1, node_col + 5), 'last char of NODE')
-  call assert_equal(definition, kube#navigation#tag_target(kbuf, 1, node_col - 1), 'column separator')
-  call assert_equal(definition, kube#navigation#tag_target(kbuf, 1, node_col - 3), 'last char of IP')
+  let Target = {col -> kube#navigation#tag_target(kbuf, resource#cell(kbuf, 1, col))}
+  call assert_equal('kube://context/ctx-a/node/node-1', Target(node_col), 'first char of NODE')
+  call assert_equal('kube://context/ctx-a/node/node-1', Target(node_col + 5), 'last char of NODE')
+  call assert_equal(definition, Target(node_col - 1), 'column separator')
+  call assert_equal(definition, Target(node_col - 3), 'last char of IP')
 endfunction
 call t#it('<C-]> resolves cells by their exact columns', function('s:test_exact_columns'))
 
@@ -702,11 +703,11 @@ function! s:test_stop_deleted_forward() abort
   call t#answer_prompts({items, opts -> 'Yes'}, v:null)
   call t#press_on('http://localhost:18080', 'dd')
   write
-  call t#wait_for({-> !kube#compat#running(job_18080)}, 'forward to stop')
+  call t#wait_for({-> !resource#running(job_18080)}, 'forward to stop')
   call t#wait_for({-> line('$') == 1 && getline(1) =~# 'http://localhost:19090'}, 'reload')
   call assert_false(has_key(kube#portforward#all()[s:KEY], 18080))
   call assert_true(has_key(kube#portforward#all()[s:KEY], 19090), 'other forward is kept')
-  call assert_true(kube#compat#running(job_19090))
+  call assert_true(resource#running(job_19090))
 endfunction
 call t#it('lists forwards and stops only the deleted one', function('s:test_stop_deleted_forward'))
 
@@ -730,14 +731,14 @@ function! s:test_unloaded() abort
   call t#wait_buf_name('kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?follow=true')
   let buf = bufnr('')
   let kbuf = t#kbuf()
-  let job = kbuf.loading_job
+  let job = kbuf.follow_job
 
   execute 'bunload!' buf
-  call t#wait_for({-> !kube#compat#running(job)}, 'job to stop')
-  call assert_true(kube#buffer#get(buf) is kbuf, 'the state is kept')
+  call t#wait_for({-> !resource#running(job)}, 'job to stop')
+  call assert_true(resource#get(buf) is kbuf, 'the state is kept')
 
   execute 'buffer' buf
-  call assert_true(!empty(kbuf.loading_job) && kbuf.loading_job isnot job, 'following again')
+  call assert_true(resource#running(kbuf.follow_job) && kbuf.follow_job isnot job, 'following again')
 endfunction
 call t#it('stops the jobs of an unloaded buffer and loads it again when edited', function('s:test_unloaded'))
 
@@ -747,10 +748,10 @@ function! s:test_wiped() abort
   call t#press_on('web-1', 'gL')
   call t#wait_buf_name('kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?follow=true')
   let buf = bufnr('')
-  let job = t#kbuf().loading_job
+  let job = t#kbuf().follow_job
   execute 'bwipeout!' buf
-  call t#wait_for({-> !kube#compat#running(job)}, 'job to stop')
-  call assert_equal({}, kube#buffer#get(buf))
+  call t#wait_for({-> !resource#running(job)}, 'job to stop')
+  call assert_equal({}, resource#get(buf))
 endfunction
 call t#it("stops the buffer's jobs when it is wiped", function('s:test_wiped'))
 
@@ -767,9 +768,9 @@ function! s:test_exit() abort
 
   call t#press_on('web-1', 'gL')
   call t#wait_buf_name('kube://context/ctx-a/namespaces/ns1/pod/web-1/logs?follow=true')
-  let logs_job = t#kbuf().loading_job
+  let logs_job = t#kbuf().follow_job
 
   doautocmd VimLeavePre
-  call t#wait_for({-> !kube#compat#running(logs_job) && !kube#compat#running(forward_job)}, 'jobs to stop')
+  call t#wait_for({-> !resource#running(logs_job) && !resource#running(forward_job)}, 'jobs to stop')
 endfunction
 call t#it('stops all jobs and port forwards on exit', function('s:test_exit'))

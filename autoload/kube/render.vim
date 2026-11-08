@@ -16,10 +16,10 @@ function! kube#render#load(kbuf) abort
       return s:api_resources(k)
     elseif k.resource_kind ==# 'portforwards'
       " From the registry instead of kubectl
-      call kube#table#render(k, kube#format#get('portforwards'), v:null, v:null)
+      call kube#render#table(k, kube#format#get('portforwards'), v:null, v:null)
       return {}
     endif
-    return kube#table#load(k)
+    return s:list(k)
   endif
 
   if empty(k.subresource_kind)
@@ -27,7 +27,7 @@ function! kube#render#load(kbuf) abort
     if type(output) == v:t_string && output ==# 'yaml'
       return s:yaml(k)
     elseif !empty(output)
-      call kube#ui#notify('Unsupported output type: ' . kube#utils#to_string(output), 'error')
+      call resource#notify('Unsupported output type: ' . resource#to_string(output), 'error')
       return {}
     endif
     return s:describe(k)
@@ -41,26 +41,26 @@ function! kube#render#load(kbuf) abort
     return s:secret_data(k)
   endif
   " Tables of the parent resource: containers, portforward
-  return kube#table#load(k)
+  return s:list(k)
 endfunction
 
 " kubectl describe of the buffer's resource.
 function! s:describe(kbuf) abort
   let k = a:kbuf
   return kube#kubectl#describe(k.context, k.resource_kind, k.resource_name, k.namespace,
-        \ function('s:set_lines', [k, 0]), kube#buffer#on_error(k))
+        \ function('s:set_lines', [k, 0]), function('resource#error', [k]))
 endfunction
 
 " kubectl rollout history of the buffer's workload.
 function! s:history(kbuf) abort
   let k = a:kbuf
   return kube#kubectl#rollout(k.context, 'history', k.resource_kind, k.resource_name, k.namespace,
-        \ function('s:set_lines', [k, 1]), kube#buffer#on_error(k))
+        \ function('s:set_lines', [k, 1]), function('resource#error', [k]))
 endfunction
 
 function! s:set_lines(kbuf, trim, result) abort
   if a:result isnot v:null && bufloaded(a:kbuf.bufnr)
-    call kube#buffer#set_lines(a:kbuf, split(a:trim ? trim(a:result) : a:result, "\n", 1))
+    call resource#set_lines(a:kbuf, split(a:trim ? trim(a:result) : a:result, "\n", 1))
   endif
 endfunction
 
@@ -68,8 +68,8 @@ endfunction
 function! s:yaml(kbuf) abort
   let k = a:kbuf
   call setbufvar(k.bufnr, '&filetype', 'yaml')
-  return kube#buffer#track(k, kube#kubectl#get_resource_yaml(k.context, k.resource_kind, k.resource_name, k.namespace,
-        \ function('s:show_yaml', [k]), kube#buffer#on_error(k)))
+  return kube#kubectl#get_resource_yaml(k.context, k.resource_kind, k.resource_name, k.namespace,
+        \ function('s:show_yaml', [k]), function('resource#error', [k]))
 endfunction
 
 function! s:show_yaml(kbuf, yaml) abort
@@ -77,7 +77,7 @@ function! s:show_yaml(kbuf, yaml) abort
     return
   endif
   if a:yaml isnot v:null
-    call kube#buffer#set_lines(a:kbuf, split(a:yaml, "\n", 1), 1)
+    call resource#set_lines(a:kbuf, split(a:yaml, "\n", 1), {'modifiable': 1})
   elseif getbufline(a:kbuf.bufnr, 1, '$') == ['']
     " Nothing loaded: nothing to edit and apply
     call setbufvar(a:kbuf.bufnr, '&modifiable', 0)
@@ -87,8 +87,8 @@ endfunction
 " The decoded data of the buffer's secret, see kube#secret.
 function! s:secret_data(kbuf) abort
   let k = a:kbuf
-  return kube#buffer#track(k, kube#kubectl#get(k.context, k.resource_kind, k.resource_name, k.namespace, {},
-        \ function('s:show_secret', [k]), kube#buffer#on_error(k)))
+  return kube#kubectl#get(k.context, k.resource_kind, k.resource_name, k.namespace, {},
+        \ function('s:show_secret', [k]), function('resource#error', [k]))
 endfunction
 
 function! s:show_secret(kbuf, result) abort
@@ -98,7 +98,7 @@ function! s:show_secret(kbuf, result) abort
   let secret = json_decode(a:result)
   let a:kbuf.data = secret
   call setbufvar(a:kbuf.bufnr, '&filetype', 'yaml')
-  call kube#buffer#set_lines(a:kbuf, kube#secret#to_lines(kube#utils#get(secret, 'data', {})), 1)
+  call resource#set_lines(a:kbuf, kube#secret#to_lines(kube#utils#get(secret, 'data', {})), {'modifiable': 1})
 endfunction
 
 " Parse the kubectl api-resources table by the columns of its header,
@@ -128,19 +128,18 @@ endfunction
 
 " The resource types of the cluster, to pick one to list.
 function! s:api_resources(kbuf) abort
-  return kube#kubectl#api_resources(a:kbuf.context, function('s:show_api_resources', [a:kbuf]), kube#buffer#on_error(a:kbuf))
+  return kube#kubectl#api_resources(a:kbuf.context, function('s:show_api_resources', [a:kbuf]), function('resource#error', [a:kbuf]))
 endfunction
 
 function! s:show_api_resources(kbuf, result, code, stderr) abort
   if a:result is v:null || !bufloaded(a:kbuf.bufnr)
     return
   endif
-  call kube#table#render(a:kbuf, kube#format#get('api-resources'), s:parse_api_resources(a:result), v:null)
+  call kube#render#table(a:kbuf, kube#format#get('api-resources'), s:parse_api_resources(a:result), v:null)
   " Exits with 1 when some API groups fail, e.g. an unavailable metrics
   " server, listing the others
   if a:code != 0
-    let OnError = kube#buffer#on_error(a:kbuf)
-    call OnError(a:stderr)
+    call resource#error(a:kbuf, a:stderr)
   endif
 endfunction
 
@@ -202,7 +201,7 @@ function! s:pods_using(kbuf) abort
   " The pods of a node are in all namespaces: only ask for those
   let node = matchstr(using, '^node/\zs.\+$')
   let params = empty(node) ? {} : {'field-selector': 'spec.nodeName=' . node}
-  return kube#kubectl#get(k.context, 'pods', '', k.namespace, params, function('s:show_pods_using', [k, using]), kube#buffer#on_error(k))
+  return kube#kubectl#get(k.context, 'pods', '', k.namespace, params, function('s:show_pods_using', [k, using]), function('resource#error', [k]))
 endfunction
 
 function! s:show_pods_using(kbuf, using, result) abort
@@ -210,7 +209,7 @@ function! s:show_pods_using(kbuf, using, result) abort
     return
   endif
   let pods = filter(json_decode(a:result).items, 'has_key(s:used_by(v:val), a:using)')
-  call kube#table#render(a:kbuf, kube#format#get('pods'), {'items': pods}, v:null)
+  call kube#render#table(a:kbuf, kube#format#get('pods'), {'items': pods}, v:null)
 endfunction
 
 " The label selector of a workload (spec.selector.matchLabels) or service
@@ -228,10 +227,7 @@ endfunction
 
 " Keep the buffer loading until the last call of the chain.
 function! s:track(kbuf, job) abort
-  if !empty(a:job)
-    call kube#buffer#track(a:kbuf, a:job)
-    let a:kbuf.loading_job = a:job
-  endif
+  call resource#track(a:kbuf, a:job)
 endfunction
 
 " The events of a workload or service and of the pods and replica sets it
@@ -240,7 +236,7 @@ endfunction
 function! s:related_events(kbuf) abort
   let k = a:kbuf
   let [resource_type, name] = matchlist(k.params.for, '^\(.\{-}\)/\(.\+\)$')[1:2]
-  return kube#kubectl#get(k.context, resource_type, name, k.namespace, {}, function('s:on_related', [k, name]), kube#buffer#on_error(k))
+  return kube#kubectl#get(k.context, resource_type, name, k.namespace, {}, function('s:on_related', [k, name]), function('resource#error', [k]))
 endfunction
 
 function! s:on_related(kbuf, name, result) abort
@@ -256,7 +252,7 @@ function! s:on_related(kbuf, name, result) abort
     return
   endif
   call s:track(a:kbuf, kube#kubectl#get(a:kbuf.context, 'pods,replicasets', '', a:kbuf.namespace, {'selector': selector},
-        \ function('s:on_owned', [a:kbuf, involved]), kube#buffer#on_error(a:kbuf)))
+        \ function('s:on_owned', [a:kbuf, involved]), function('resource#error', [a:kbuf])))
 endfunction
 
 function! s:on_owned(kbuf, involved, result) abort
@@ -271,7 +267,7 @@ endfunction
 
 function! s:load_events(kbuf, involved) abort
   call s:track(a:kbuf, kube#kubectl#get(a:kbuf.context, 'events', '', a:kbuf.namespace, {},
-        \ function('s:show_events', [a:kbuf, a:involved]), kube#buffer#on_error(a:kbuf)))
+        \ function('s:show_events', [a:kbuf, a:involved]), function('resource#error', [a:kbuf])))
 endfunction
 
 function! s:show_events(kbuf, involved, result) abort
@@ -280,5 +276,107 @@ function! s:show_events(kbuf, involved, result) abort
   endif
   let events = filter(json_decode(a:result).items,
         \ 'has_key(a:involved, kube#utils#dig(v:val, "involvedObject.kind", "") . "/" . kube#utils#dig(v:val, "involvedObject.name", ""))')
-  call kube#table#render(a:kbuf, kube#format#get('events'), {'items': events}, v:null)
+  call kube#render#table(a:kbuf, kube#format#get('events'), {'items': events}, v:null)
+endfunction
+
+" ---------------------------------------------------------------------------
+" Lists
+
+" The formatter of the buffer's list, see kube#format.
+function! kube#render#formatter(kbuf) abort
+  return kube#format#get(empty(a:kbuf.subresource_kind) ? a:kbuf.resource_kind : a:kbuf.subresource_kind)
+endfunction
+
+" Contexts whose cluster has no metrics API, not asked again
+let s:metrics_unavailable = {}
+
+" CPU and memory usage by namespace/name, from kubectl top --no-headers.
+function! s:parse_metrics(output, kind, namespace) abort
+  let metrics = {}
+  for line in split(a:output, "\n")
+    let fields = split(line)
+    if a:kind ==# 'nodes'
+      " NAME CPU(cores) CPU(%) MEMORY(bytes) MEMORY(%)
+      let metrics['/' . fields[0]] = [fields[1], fields[3]]
+    elseif tolower(a:namespace) ==# 'all'
+      let metrics[fields[0] . '/' . fields[1]] = [fields[2], fields[3]]
+    else
+      let metrics[a:namespace . '/' . fields[0]] = [fields[1], fields[2]]
+    endif
+  endfor
+  return metrics
+endfunction
+
+" Load a list with kubectl get, and the metrics of its resources when they have.
+function! s:list(kbuf) abort
+  let k = a:kbuf
+  let formatter = kube#render#formatter(k)
+  let kind = empty(k.resource_name) ? get(formatter, 'metrics', '') : ''
+  let with_metrics = !empty(kind) && !has_key(s:metrics_unavailable, k.context)
+
+  " Render once the resources and, if asked, their metrics are loaded
+  let state = {'kbuf': k, 'formatter': formatter, 'pending': with_metrics ? 2 : 1, 'data': v:null, 'metrics': v:null}
+  let job = kube#kubectl#get(k.context, k.resource_kind, k.resource_name, k.namespace, k.params,
+        \ function('s:on_data', [state]), function('resource#error', [k]))
+  if empty(job) || !with_metrics
+    return job
+  endif
+  let top = kube#kubectl#top(k.context, kind, k.namespace, get(k.params, 'selector', ''),
+        \ function('s:on_metrics', [state, kind]), function('s:on_metrics_error', [k.context]))
+  if empty(top)
+    call s:loaded(state)
+    return job
+  endif
+  return [job, top]
+endfunction
+
+function! s:loaded(state) abort
+  let a:state.pending -= 1
+  if a:state.pending == 0 && a:state.data isnot v:null && bufloaded(a:state.kbuf.bufnr)
+    call kube#render#table(a:state.kbuf, a:state.formatter, a:state.data, a:state.metrics)
+  endif
+endfunction
+
+function! s:on_data(state, result) abort
+  if a:result isnot v:null && bufloaded(a:state.kbuf.bufnr)
+    let a:state.data = json_decode(a:result)
+  endif
+  call s:loaded(a:state)
+endfunction
+
+function! s:on_metrics(state, kind, result) abort
+  if a:result isnot v:null
+    let a:state.metrics = s:parse_metrics(a:result, a:kind, a:state.kbuf.namespace)
+  endif
+  call s:loaded(a:state)
+endfunction
+
+function! s:on_metrics_error(context, err) abort
+  if stridx(a:err, 'Metrics API not available') >= 0
+    let s:metrics_unavailable[a:context] = 1
+  endif
+endfunction
+
+" Insert the CPU and memory usage columns before AGE, returns the headers.
+function! s:add_metrics(headers, rows, metrics) abort
+  let at = index(a:headers, 'AGE')
+  let at = at < 0 ? len(a:headers) : at
+  for row in a:rows
+    let usage = get(a:metrics, kube#utils#get(row.item.metadata, 'namespace', '') . '/' . row.item.metadata.name, ['', ''])
+    call extend(row.row, usage, at)
+  endfor
+  return extend(copy(a:headers), ['CPU', 'MEMORY'], at)
+endfunction
+
+" Render the rows of {data} (the decoded output) with {formatter} as a table.
+" {metrics}: the usage of the resources, adds CPU and MEMORY columns, or v:null.
+function! kube#render#table(kbuf, formatter, data, metrics) abort
+  let a:kbuf.data = a:data
+  let rows = a:formatter.fn(a:data, a:kbuf)
+  let headers = a:formatter.headers
+  if a:metrics isnot v:null
+    let headers = s:add_metrics(headers, rows, a:metrics)
+  endif
+  call resource#render(a:kbuf, {'headers': headers, 'rows': rows, 'empty': get(a:formatter, 'empty', 'No resources found'),
+        \ 'editable': get(a:formatter, 'editable', {})})
 endfunction

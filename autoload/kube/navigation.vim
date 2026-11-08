@@ -22,26 +22,14 @@ function! kube#navigation#api_resource_target(kbuf, item) abort
   return kube#utils#buf_name({'context': a:kbuf.context, 'namespace': a:item.namespaced ? a:kbuf.namespace : '', 'kind': a:item.name})
 endfunction
 
-" The cell at {lnum} and the 0-indexed byte {col}, or just the item of the
-" row between cells: {item, column}, {} if none.
-function! s:cell_at(kbuf, lnum, col) abort
-  for id in kube#compat#cells_at(a:kbuf.bufnr, a:lnum, a:col)
-    if has_key(a:kbuf.cells, id)
-      return a:kbuf.cells[id]
-    endif
-  endfor
-  let item = kube#table#item_at(a:kbuf, a:lnum)
-  return item is v:null ? {} : {'item': item, 'column': ''}
-endfunction
-
-" The buffer the cell at {lnum} and the 0-indexed byte {col} refers to, like a
+" The buffer a cell ({item, column, text}, see resource#cell()) refers to, like a
 " tag: NAMESPACE -> the same list in that namespace, NODE -> the node, an
 " event's OBJECT -> that object, a namespace row -> its pods, a resource type
 " -> its list, a Helm release -> its values, a revision -> its manifest,
 " anything else -> the resource's definition (YAML). '' if none.
-function! kube#navigation#tag_target(kbuf, lnum, col) abort
+function! kube#navigation#tag_target(kbuf, cell) abort
   let k = a:kbuf
-  let cell = s:cell_at(k, a:lnum, a:col)
+  let cell = a:cell
   let item = get(cell, 'item', v:null)
   if type(item) != v:t_dict
     return ''
@@ -80,17 +68,4 @@ function! kube#navigation#tag_target(kbuf, lnum, col) abort
   endif
   return kube#utils#buf_name({'context': k.context, 'namespace': namespace, 'kind': kube#utils#resource_type(item),
         \ 'name': item.metadata.name, 'params': {'output': 'yaml'}})
-endfunction
-
-" 'tagfunc' of kube buffers, so that <C-]>, <C-w>], <C-t> and the tag stack
-" work as usual.
-function! kube#navigation#tagfunc(pattern, flags, info) abort
-  let kbuf = kube#buffer#get(bufnr(''))
-  " Only jumps from the cursor are resolved here, :tag {name} uses the tags
-  " files
-  if empty(kbuf) || a:flags !~# 'c'
-    return v:null
-  endif
-  let target = kube#navigation#tag_target(kbuf, line('.'), col('.') - 1)
-  return empty(target) ? [] : [{'name': a:pattern, 'filename': target, 'cmd': '1'}]
 endfunction

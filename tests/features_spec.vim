@@ -38,7 +38,7 @@ function! s:test_errors_silent() abort
   call t#open('kube://namespaces/ns1/pods')
   let messages = t#capture_notify()
   call t#respond('*get pods -o json*', {'stderr': 'connection refused', 'code': 1})
-  call kube#buffer#load(t#kbuf(), {'silent': 1})
+  call resource#load(t#kbuf(), {'silent': 1})
   call t#wait_loaded()
   call assert_equal('✗ connection refused', t#status())
   call assert_equal([], messages)
@@ -50,7 +50,7 @@ function! s:test_reload_closed() abort
   call t#open('kube://namespaces/ns1/pods')
   let kbuf = t#kbuf()
   bwipeout!
-  call kube#buffer#load(kbuf)
+  call resource#load(kbuf)
 endfunction
 call t#it('reloading a closed buffer is a no-op', function('s:test_reload_closed'))
 
@@ -474,7 +474,7 @@ function! s:test_global_forwards() abort
   call t#answer_prompts({items, opts -> 'Yes'}, v:null)
   call t#press_on('ctx-b', 'dd')
   write
-  call t#wait_for({-> !kube#compat#running(job) && line('$') == 1}, 'forward to stop')
+  call t#wait_for({-> !resource#running(job) && line('$') == 1}, 'forward to stop')
   call assert_true(has_key(kube#portforward#all()['ctx-a/ns1/pod/web-1'], 18080), 'the other forward is kept')
 endfunction
 call t#it('lists forwards of all contexts, deleting a line stops it', function('s:test_global_forwards'))
@@ -497,7 +497,7 @@ function! s:test_forward_operations() abort
 
   call t#answer_prompts({items, opts -> 'Yes'}, v:null)
   call t#operation('Stop')
-  call t#wait_for({-> !kube#compat#running(job)}, 'forward to stop')
+  call t#wait_for({-> !resource#running(job)}, 'forward to stop')
   call assert_false(has_key(kube#portforward#all()[key], 18080))
 endfunction
 call t#it('offer stopping them and going to the forwarded resource', function('s:test_forward_operations'))
@@ -509,7 +509,7 @@ function! s:test_watch() abort
   call assert_equal(1, len(t#calls_matching('get pods')))
 
   call t#press('gw')
-  call assert_match('⟳ 0.2s', kube#compat#header(bufnr(''), win_getid()))
+  call assert_match('⟳ 0.2s', resource#compat#header(win_getid()))
   call t#wait_call('get pods', 3)
 
   normal! dd
@@ -519,7 +519,7 @@ function! s:test_watch() abort
   normal! u
 
   call t#press('gw')
-  call assert_notmatch('⟳', kube#compat#header(bufnr(''), win_getid()))
+  call assert_notmatch('⟳', resource#compat#header(win_getid()))
   call t#wait(300)
   let stopped = len(t#calls_matching('get pods'))
   call t#wait(500)
@@ -531,7 +531,7 @@ function! s:test_watch_lists() abort
   let messages = t#capture_notify()
   call t#open('kube://context/ctx-a/namespaces/ns1/deployment.apps/web?output=yaml')
   call t#press('gw')
-  call assert_equal('Only resource lists can be watched', messages[-1].msg)
+  call assert_equal('Only lists can be watched', messages[-1].msg)
 endfunction
 call t#it('is only for lists', function('s:test_watch_lists'))
 
@@ -577,7 +577,7 @@ function! s:test_diagnostic_keys() abort
   call assert_equal(2, line('.'), 'no unhealthy resource above')
   call t#press("\<C-w>d")
   let float = t#wait_float('The pod is not ready: 0/3 nodes are available')
-  call kube#compat#close_float(float)
+  call resource#compat#close_float(float)
 endfunction
 call t#it(']d goes to the next unhealthy resource, <C-w>d shows why', function('s:test_diagnostic_keys'))
 
@@ -605,7 +605,7 @@ call t#describe('lists')
 " Put the cursor on the {column} cell of the row of {name} and type {keys}.
 function! s:edit_cell(name, column, keys) abort
   let kbuf = t#kbuf()
-  let cells = kube#compat#cells(kbuf.bufnr)
+  let cells = resource#compat#cells(kbuf.bufnr)
   for [id, cell] in items(kbuf.cells)
     let item = cell.item
     let item_name = type(item) != v:t_dict ? '' : has_key(item, 'metadata') ? item.metadata.name : get(item, 'name', '')
@@ -626,7 +626,7 @@ function! s:test_header_sign_column() abort
   call assert_true(!empty(t#diagnostics()), 'an unhealthy pod')
   let textoff = getwininfo(win_getid())[0].textoff
   call assert_true(textoff > 0, 'a sign column')
-  call assert_equal(repeat(' ', textoff) . '%#', &winbar[: textoff + 1])
+  call assert_equal(repeat(' ', textoff) . '%#', resource#compat#winbar(win_getid())[: textoff + 1])
 endfunction
 call t#it('align the header with the sign column of the diagnostics', function('s:test_header_sign_column'))
 
@@ -635,12 +635,12 @@ function! s:test_header_vim() abort
     call t#skip('Neovim shows the header in the winbar')
   endif
   call t#open(s:PODS)
-  call assert_match('^NAMESPACE\s\+NAME\s\+READY', kube#compat#header(bufnr(''), win_getid()))
+  call assert_match('^\s*NAMESPACE\s\+NAME\s\+READY', resource#compat#header(win_getid()))
   call t#press_on('web-1', 'dd')
   doautocmd TextChanged
-  call assert_match('^NAMESPACE', kube#compat#header(bufnr(''), win_getid()), 'shown when the first line is deleted')
+  call assert_match('^\s*NAMESPACE', resource#compat#header(win_getid()), 'shown when the first line is deleted')
 endfunction
-call t#it('show the header above the first line in Vim', function('s:test_header_vim'))
+call t#it('show the header in the WinBar in Vim', function('s:test_header_vim'))
 
 function! s:test_deleted_rows() abort
   call t#open(s:PODS)
@@ -648,7 +648,7 @@ function! s:test_deleted_rows() abort
   let &undolevels = &undolevels
   call t#press_on('web-1', 'dd')
   doautocmd TextChanged
-  let marks = kube#compat#get_virt_lines(bufnr(''))
+  let marks = resource#compat#get_virt_lines(bufnr(''))
   call assert_equal(1, len(marks))
   call assert_equal(1, marks[0][0])
   call assert_equal(1, marks[0][2], 'above')
@@ -660,21 +660,21 @@ function! s:test_deleted_rows() abort
   let &undolevels = &undolevels
   call t#press_on('web-2', 'dd')
   doautocmd TextChanged
-  let marks = kube#compat#get_virt_lines(bufnr(''))
+  let marks = resource#compat#get_virt_lines(bufnr(''))
   call assert_equal(1, len(marks), 'below the last line')
   call assert_equal(2, len(marks[0][1]))
   call assert_equal(0, marks[0][2])
 
   silent normal! uu
   doautocmd TextChanged
-  call assert_equal([], kube#compat#get_virt_lines(bufnr('')))
+  call assert_equal([], resource#compat#get_virt_lines(bufnr('')))
 endfunction
 call t#it('show deleted rows until they are written or restored', function('s:test_deleted_rows'))
 
 function! s:highlighted(hl_filter) abort
   let kbuf = t#kbuf()
   let result = []
-  for [id, cell] in items(kube#compat#cells(kbuf.bufnr))
+  for [id, cell] in items(resource#compat#cells(kbuf.bufnr))
     if !empty(cell[3]) && cell[3] =~# a:hl_filter
       let c = kbuf.cells[id]
       call add(result, printf('%s %s %s', c.item.metadata.name, c.column, cell[3]))
@@ -703,26 +703,26 @@ function! s:test_flash() abort
 
   " Only the order changed
   call t#respond('*get pods -o json*', {'fixture': 'pods-reversed.json'})
-  call kube#buffer#load(kbuf, {'silent': 1})
+  call resource#load(kbuf, {'silent': 1})
   call t#wait_loaded()
-  call assert_equal([], kube#compat#highlighted_lines(bufnr(''), 'changed'))
+  call assert_equal([], resource#compat#highlighted_lines(bufnr(''), 'changed'))
 
   let data = t#json('pods.json')
   let data.items[1].status.phase = 'Failed'
   call t#respond('*get pods -o json*', {'stdout': json_encode(data)})
-  call kube#buffer#load(kbuf, {'silent': 1})
+  call resource#load(kbuf, {'silent': 1})
   call t#wait_loaded()
-  let lines = kube#compat#highlighted_lines(bufnr(''), 'changed')
+  let lines = resource#compat#highlighted_lines(bufnr(''), 'changed')
   call assert_equal(1, len(lines))
   call assert_match('web-2', getline(lines[0]))
-  call t#wait_for({-> empty(kube#compat#highlighted_lines(bufnr(''), 'changed'))}, 'the flash to end')
+  call t#wait_for({-> empty(resource#compat#highlighted_lines(bufnr(''), 'changed'))}, 'the flash to end')
 
   " A reload asked for does not flash
   let data.items[1].status.phase = 'Pending'
   call t#respond('*get pods -o json*', {'stdout': json_encode(data)})
-  call kube#buffer#load(kbuf)
+  call resource#load(kbuf)
   call t#wait_loaded()
-  call assert_equal([], kube#compat#highlighted_lines(bufnr(''), 'changed'))
+  call assert_equal([], resource#compat#highlighted_lines(bufnr(''), 'changed'))
 endfunction
 call t#it('flash the rows a watched reload changed', function('s:test_flash'))
 

@@ -47,7 +47,7 @@ function! s:describe(kbuf, resource) abort
 endfunction
 
 function! s:no_logs(kbuf, resource, follow) abort
-  call kube#ui#notify(printf('%s resources do not support logs', a:resource.kind), 'warn')
+  call resource#notify(printf('%s resources do not support logs', a:resource.kind), 'warn')
 endfunction
 
 " The containers of a pod template.
@@ -58,7 +58,7 @@ endfunction
 function! s:set_image(kbuf, resource, containers) abort
   let containers = map(copy(a:containers), '{"name": v:val.name, "image": kube#utils#get(v:val, "image", "")}')
   call kube#actions#prompt_set_image(a:kbuf.context, containers, kube#utils#resource_type(a:resource),
-        \ a:resource.metadata.name, a:resource.metadata.namespace, {changed -> changed ? kube#buffer#load(a:kbuf) : 0})
+        \ a:resource.metadata.name, a:resource.metadata.namespace, {changed -> changed ? resource#load(a:kbuf) : 0})
 endfunction
 
 " The ports of {containers}: [{container, port, protocol}].
@@ -172,7 +172,7 @@ endfunction
 " Resource types of kube://
 
 function! s:apiresource_list(kbuf, type) abort
-  call kube#utils#edit(kube#navigation#api_resource_target(a:kbuf, a:type))
+  call resource#open(kube#navigation#api_resource_target(a:kbuf, a:type))
 endfunction
 
 " Helm releases and their revisions
@@ -277,7 +277,7 @@ endfunction
 " Run the action {name} on the resource under the cursor. Rows without a kind
 " (e.g. containers) are dispatched by the buffer's subresource kind.
 function! kube#actions#run(kbuf, name, ...) abort
-  let resource = kube#table#item_at(a:kbuf, line('.'))
+  let resource = resource#item(a:kbuf)
   if type(resource) != v:t_dict
     return
   endif
@@ -287,7 +287,7 @@ function! kube#actions#run(kbuf, name, ...) abort
   endif
   let Action = kube#actions#get(tolower(kind), a:name)
   if Action is v:null
-    call kube#ui#notify(printf('%s is not supported for %s', a:name, kind), 'warn')
+    call resource#notify(printf('%s is not supported for %s', a:name, kind), 'warn')
     return
   endif
   call call(Action, [a:kbuf, resource] + a:000)
@@ -296,10 +296,10 @@ endfunction
 " Prompt for the container of {containers} ([{name, image}]) and its new image.
 function! kube#actions#prompt_set_image(context, containers, kind, name, namespace, Callback) abort
   if empty(a:containers)
-    call kube#ui#notify('No containers available', 'warn')
+    call resource#notify('No containers available', 'warn')
     return
   endif
-  call kube#ui#select(map(copy(a:containers), 'v:val.name . ": " . v:val.image'), {'prompt': 'Select container to update:'},
+  call resource#select(map(copy(a:containers), 'v:val.name . ": " . v:val.image'), {'prompt': 'Select container to update:'},
         \ function('s:on_container', [a:context, a:containers, a:kind, a:name, a:namespace, a:Callback]))
 endfunction
 
@@ -308,7 +308,7 @@ function! s:on_container(context, containers, kind, name, namespace, Callback, c
     return
   endif
   let container = a:containers[a:index - 1]
-  call kube#ui#input({'prompt': 'New image: ', 'default': container.image},
+  call resource#input({'prompt': 'New image: ', 'default': container.image},
         \ function('s:on_image', [a:context, container, a:kind, a:name, a:namespace, a:Callback]))
 endfunction
 
@@ -318,12 +318,12 @@ function! s:on_image(context, container, kind, name, namespace, Callback, image)
     return
   endif
   call kube#kubectl#set_image(a:context, a:kind, a:name, a:namespace, a:container.name, a:image,
-        \ function('s:image_set', [a:container, a:image, a:Callback]), {err -> kube#ui#notify(err, 'error')})
+        \ function('s:image_set', [a:container, a:image, a:Callback]), {err -> resource#notify(err, 'error')})
 endfunction
 
 function! s:image_set(container, image, Callback, result) abort
   if a:result isnot v:null
-    call kube#ui#notify(printf("Successfully updated image for container '%s' to '%s'", a:container.name, a:image))
+    call resource#notify(printf("Successfully updated image for container '%s' to '%s'", a:container.name, a:image))
   endif
   call a:Callback(a:result isnot v:null)
 endfunction

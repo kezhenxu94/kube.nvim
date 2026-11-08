@@ -16,7 +16,7 @@ call t#it('builds a namespaced name with a context', function('s:test_namespaced
 function! s:test_encodes() abort
   call assert_equal('kube://context/arn%3aaws%3aeks%3aus-east-1%3a1%3acluster%2fprod/pods',
         \ kube#utils#buf_name({'context': 'arn:aws:eks:us-east-1:1:cluster/prod', 'kind': 'pods'}))
-  call assert_equal('a/b:c é', kube#utils#uri_decode(kube#utils#uri_encode('a/b:c é')))
+  call assert_equal('a/b:c é', resource#uri_decode(resource#uri_encode('a/b:c é')))
 endfunction
 call t#it('encodes contexts containing / and :', function('s:test_encodes'))
 
@@ -97,32 +97,28 @@ function! s:test_age() abort
 endfunction
 call t#it('formats seconds, minutes, hours and days', function('s:test_age'))
 
-call t#describe('utils.get_winbar')
+call t#describe('header')
 
 function! s:header_buffer(formatted) abort
-  enew
-  file kube://context/c/pods
-  let kbuf = kube#buffer#new(bufnr(''))
+  call t#reset_kubectl()
+  call t#respond('*get pods*', {'stdout': '{"items": []}'})
+  call t#open('kube://context/c/pods')
+  let kbuf = t#kbuf()
   let kbuf.header_row = {'formatted': a:formatted, 'highlight': 'KubeHeader'}
   return kbuf
 endfunction
-
-function! s:clean_header_buffer() abort
-  call kube#buffer#forget(bufnr(''))
-  silent! %bwipeout!
-endfunction
-call t#after_each(function('s:clean_header_buffer'))
+call t#after_each(function('t#clean_buffers'))
 
 function! s:test_winbar_without_number() abort
-  let kbuf = s:header_buffer('NAME  AGE')
+  call s:header_buffer('NAME  AGE')
   setlocal nonumber signcolumn=no
-  call assert_equal('%#KubeHeader#NAME  AGE%=%#Comment#', kube#utils#get_winbar(kbuf.bufnr, win_getid()))
+  call assert_equal('%#KubeHeader#NAME  AGE%=%#Comment#', resource#compat#winbar(win_getid()))
 endfunction
 call t#it('works without a number column', function('s:test_winbar_without_number'))
 
 function! s:test_winbar_number() abort
-  let kbuf = s:header_buffer('NAME')
+  call s:header_buffer('NAME')
   setlocal number
-  call assert_match('^ \+%#KubeHeader#NAME%=%#Comment#$', kube#utils#get_winbar(kbuf.bufnr, win_getid()))
+  call assert_match('^ \+%#KubeHeader#NAME%=%#Comment#$', resource#compat#winbar(win_getid()))
 endfunction
 call t#it('pads for the number column', function('s:test_winbar_number'))
