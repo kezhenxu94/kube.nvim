@@ -7,11 +7,10 @@ CONTENTS                                                       *kube-contents*
   2. Commands ............................................... |kube-commands|
   3. Buffers ................................................ |kube-buffers|
   4. Keymaps ................................................ |kube-keymaps|
-  5. Language server ........................................ |kube-lsp|
+  5. Operations ............................................. |kube-operations|
   6. Editing ................................................ |kube-editing|
   7. Helm ................................................... |kube-helm|
   8. Configuration .......................................... |kube-config|
-  9. Health ................................................. |kube-health|
 
 ==============================================================================
 1. Introduction                                         *kube.nvim* *kube*
@@ -20,11 +19,11 @@ kube.nvim shows Kubernetes resources in buffers: lists, `kubectl describe`,
 YAML, logs, events, decoded secrets and Helm releases. Delete a line and |:w|
 to delete a resource, edit the YAML and |:w| to apply it.
 
-Requirements: Neovim >= 0.11 and `kubectl` in $PATH. `helm` in $PATH for Helm
-releases, see |kube-helm|.
+Requirements: Vim >= 9.2 or Neovim >= 0.11, and `kubectl` in $PATH. `helm` in
+$PATH for Helm releases, see |kube-helm|.
 
-|setup()| is optional, the |:Kube| command and the `kube://` buffers work
-without it.
+There is nothing to set up, the |:Kube| command and the `kube://` buffers work
+as soon as the plugin is installed, see |kube-config| to change the defaults.
 
 ==============================================================================
 2. Commands                                                    *kube-commands*
@@ -105,6 +104,10 @@ Views of a resource ({sub} and {params}):
 Lists take kubectl flags as params, e.g. `?selector=app=web` or
 `?field-selector=involvedObject.name=web`.
 
+Lists have a header: in the winbar in Neovim, above the first line in Vim.
+Unhealthy resources (failing pods, not ready nodes, warning events, failed
+Helm releases, ...) have a sign, see |kube-keymaps| for |]d| and |CTRL-W_d|.
+
 Lists of pods and nodes have CPU and MEMORY columns (`kubectl top`) when the
 cluster has the metrics API, e.g. with metrics-server. Statuses are shown as
 kubectl does: `CrashLoopBackOff`, `Init:0/1`, `NotReady,SchedulingDisabled`, ...
@@ -116,24 +119,31 @@ for JSON logs. There is nothing to write back: |:w| fails and keeps the edits,
 ==============================================================================
 4. Keymaps                                                      *kube-keymaps*
 
-Keymaps follow Neovim's conventions: LSP's |gd|, |gD|, |K|, |CTRL-]| and the
-built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
+Keymaps follow the conventions of Vim and Neovim: |gd|, |gD|, |K|, |CTRL-]| and
+the built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
+They can be changed with |g:kube_keymaps|.
 
     <CR>    Drill down: a pod's containers, a deployment's pods, a secret's
             decoded data, ...
     gd      Go to what the cell under the cursor refers to, see |kube-jump|
     gD      Go to the owner: pod -> replica set -> deployment, job -> cron job
     K       Describe the resource under the cursor, explain a resource type
-            (`kubectl explain`) in `kube://` (LSP hover)
+            (`kubectl explain`) in `kube://`, show the status of a Helm
+            release, in a floating window
     -       Parent: resource -> list in its namespace -> all namespaces ->
             namespaces -> resource types
     R       Reload, the cursor stays on the same resource
-    gw      Toggle watching: reload the list every `refresh_interval`
+    gw      Toggle watching: reload the list every |g:kube_refresh_interval|
     gl gL   Show / follow logs, <C-c> stops following
     gf      Forward ports
     gF      Show port forwards
     gi      Set image
     gs      Shell (`kubectl exec`)
+    gra     Operations on the resource under the cursor, or on the resources
+            of a visual selection, see |kube-operations|
+    ]d [d   Next / previous unhealthy resource
+    CTRL-W d
+            Show why the resource of the cursor line is unhealthy
     g?      Help
 
                                                                    *kube-jump*
@@ -146,31 +156,17 @@ built-in directory browser's <CR>, `-` and `R`. Press `g?` for the help.
     a Helm release  its values, a revision its manifest, see |kube-helm|
     anything else   the resource's YAML
 |CTRL-T| jumps back and |CTRL-W_]| opens the jump in a split, as with tags.
+In Neovim this is the 'tagfunc' of kube buffers. Vim refuses tags of URLs,
+there CTRL-], CTRL-W ] and CTRL-W CTRL-] are mapped and push the jump on the
+|tagstack|.
 
-Built-in keys that also work: |]d| / |[d| to the next / previous unhealthy
-resource, |CTRL-W_d| shows why, |gx| opens a port forward URL.
+The built-in |gx| opens a port forward URL.
 
 ==============================================================================
-5. Language server                                                  *kube-lsp*
+5. Operations                                                *kube-operations*
 
-kube.nvim attaches an in-process language server named "kube" to its buffers,
-so LSP keymaps and pickers work on them:
-    hover               describe, explain a resource type, `helm status` of
-                        a release (|K|)
-    definition          |kube-jump|
-    declaration         the owner of the resource (|gD|)
-    references          the pods using a config map, secret, persistent
-                        volume claim, service account or node (|grr|), as
-                        rows of `kube://.../pods?using={kind}/{name}`
-    document symbols    the resources of the list (|gO|)
-    selection ranges    the cell, the row, the list: |an| / |in| (Neovim 0.12+)
-                        select them, e.g. `can` changes an editable cell
-    code lenses         Show logs, Follow logs and Exec above each container
-                        of the YAML of a pod or a workload, run with |grx|
-                        (Neovim 0.12+) or |vim.lsp.codelens.run()|; shown
-                        with |vim.lsp.codelens.enable()|
-    code actions        every operation on the resource under the cursor
-                        (|gra|), or on all resources of a visual selection:
+`gra` selects one of the operations on the resource under the cursor, or on
+all resources of a visual selection:
 
     Open, Describe, Go to YAML, Show events, Show logs, Follow logs, Show logs
     of all containers, Show logs of the previous instance, Show logs since…,
@@ -179,17 +175,24 @@ so LSP keymaps and pickers work on them:
     jobs), Decode secret, Cordon, Uncordon, Drain, Delete
 
     Resource types (`kube://`): List, List in all namespaces, Show events.
+    Containers of a pod: Show logs, Follow logs, Show logs of the previous
+    instance, Exec, Forward port.
     Port forwards: Open in browser, Go to the resource, Stop.
     Helm releases and their revisions: see |kube-helm|.
 
 Operations changing the cluster ask for confirmation, naming the context.
 
+The pods using a config map, secret, persistent volume claim, service account
+or node are listed by `kube://.../pods?using={kind}/{name}`, e.g. >
+    :e kube://ns/staging/pods?using=secret/db
+    :e kube://pods?using=node/node-1
+<
 ==============================================================================
 6. Editing                                                      *kube-editing*
 
 Lists: delete lines and |:w| to delete those resources (uninstall those Helm
 releases, see |kube-helm|), after confirming. The
-deleted lines stay visible, as virtual lines, until written or undone. Deleted
+deleted lines stay visible, as virtual text, until written or undone. Deleted
 lines and edited cells are confirmed together.
 
 Edit cells and |:w| to apply them, after confirming all changes; |:w!|
@@ -223,7 +226,7 @@ The list (`helm list`) shows releases of all statuses: failed releases
 are errors and pending ones warnings, see |]d|.
 
 Views of a release, `kube://.../namespaces/{ns}/helm-releases/{name}[/{sub}]`:
-    (none)                `helm status`, also the hover (|K|) of a release
+    (none)                `helm status`, also shown by |K| on a release
     `/manifest`             What it deployed (<CR>), param: `revision`
     `/values`               The user supplied values (|gd|, |CTRL-]|), params:
                           `all` (the computed values), `revision`
@@ -233,7 +236,7 @@ Views of a release, `kube://.../namespaces/{ns}/helm-releases/{name}[/{sub}]`:
 Values are read-only: a release does not record where its chart comes from,
 upgrade it with `helm upgrade`.
 
-Code actions (|gra|) of a release: Show manifest, Show values, Show all
+Operations (`gra`) of a release: Show manifest, Show values, Show all
 values, Show notes, Show status, Show history, Rollback to the previous
 revision, Uninstall (also of the releases of a visual selection). Of a revision of the
 history: Rollback to revision {n}, Show manifest / values of revision {n}.
@@ -244,37 +247,54 @@ resources, see |kube-editing|.
 ==============================================================================
 8. Configuration                                                 *kube-config*
 
-Defaults: >lua
-    require("kube").setup({
-      keymaps = {
-        drill_down = "<cr>", show_yaml = "gd", owner = "gD", describe = "K",
-        parent = "-",
-        refresh = "R", watch = "gw", show_logs = "gl", follow_logs = "gL",
-        port_forward = "gF", forward_port = "gf", set_image = "gi",
-        exec = "gs", help = "g?",
-      },
-      -- How often watched lists (gw) reload, in ms, false to disable watching
-      refresh_interval = 10000,
-      -- kubectl --request-timeout, except for streams (logs -f, port-forward)
-      request_timeout = "30s",
-      logs = {
-        tail = 1000,       -- lines to fetch, -1 for all
-        max_lines = 10000, -- lines kept while following, -1 for all
-      },
-      -- Overrides, by default linked to your colorscheme's groups:
-      -- KubeBody (Normal), KubePending (DiagnosticWarn),
-      -- KubeRunning (Normal), KubeFailed (DiagnosticError),
-      -- KubeSucceeded, KubeUnknown (Comment), KubeHeader (Title),
-      -- KubeDeleted (DiffDelete), KubeChanged (DiffChange),
-      -- KubeEditable (Identifier)
-      -- e.g. { KubeHeader = { fg = "#df8e1d", bold = true } }
-      highlights = {},
-    })
-<
-==============================================================================
-9. Health                                                        *kube-health*
+Set these variables before kube buffers are opened. The defaults:
 
-`:checkhealth kube` checks the Neovim version, kubectl, helm (optional), the
-current context and whether its cluster is reachable.
+                                                               *g:kube_keymaps*
+The keymaps by action, only the ones to change are needed, '' disables one: >
+    let g:kube_keymaps = {
+          \ 'drill_down': '<CR>', 'show_yaml': 'gd', 'owner': 'gD',
+          \ 'describe': 'K', 'parent': '-', 'refresh': 'R', 'watch': 'gw',
+          \ 'show_logs': 'gl', 'follow_logs': 'gL', 'port_forward': 'gF',
+          \ 'forward_port': 'gf', 'set_image': 'gi', 'exec': 'gs',
+          \ 'operations': 'gra', 'help': 'g?',
+          \ }
+<
+                                                      *g:kube_refresh_interval*
+How often watched lists (`gw`) reload, in milliseconds, 0 to disable
+watching: >
+    let g:kube_refresh_interval = 10000
+<
+                                                       *g:kube_request_timeout*
+kubectl --request-timeout, except for streams (logs -f, port-forward, exec,
+drain), also the timeout of helm commands that do not change releases: >
+    let g:kube_request_timeout = '30s'
+<
+                                                            *g:kube_logs_tail*
+Log lines to fetch, -1 for all: >
+    let g:kube_logs_tail = 1000
+<
+                                                       *g:kube_logs_max_lines*
+Log lines kept while following, the oldest are dropped, -1 for all: >
+    let g:kube_logs_max_lines = 10000
+<
+                                                           *g:kube_highlights*
+Highlight overrides as |:highlight| arguments by group, kept across
+colorschemes, e.g. >
+    let g:kube_highlights = {'KubeHeader': 'guifg=#df8e1d gui=bold'}
+<
+By default the groups link to the colorscheme's:
+    KubeBody        Normal
+    KubePending     DiagnosticWarn (Neovim), WarningMsg (Vim)
+    KubeRunning     Normal
+    KubeFailed      DiagnosticError (Neovim), ErrorMsg (Vim)
+    KubeSucceeded   Comment
+    KubeUnknown     Comment
+    KubeHeader      Title
+    KubeDeleted     DiffDelete: deleted lines
+    KubeChanged     DiffChange: lines a watched reload changed
+    KubeEditable    Identifier: cells of editable columns
+    KubeSignError, KubeSignWarn, KubeSignInfo
+                    the signs of unhealthy resources: DiagnosticSign* (Neovim),
+                    ErrorMsg, WarningMsg, Comment (Vim)
 
  vim:tw=78:ts=8:ft=help:norl:
