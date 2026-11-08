@@ -129,7 +129,7 @@ We welcome contributions to kube.nvim! If you would like to contribute, please f
 2. Make your changes and ensure that the code passes all tests.
 3. Submit a pull request with a description of your changes.
 
-* `make test`: Tests in Vim and in headless Neovim (`make test-vim` / `make test-nvim` for one of them, `VIM=` / `NVIM=` to pick the executables) against a fake `kubectl` (`tests/bin/kubectl`), never a real cluster. They use the resource.vim checkout `RESOURCE_VIM`, `../resource.vim` by default.
+* `make test`: Tests in Vim and in headless Neovim (`make test-vim` / `make test-nvim` for one of them, `VIM_BIN=` / `NVIM_BIN=` to pick the executables) against a fake `kubectl` (`tests/bin/kubectl`), never a real cluster. They use the resource.vim checkout `RESOURCE_VIM`, `../resource.vim` by default.
 * `make test-e2e`: End-to-end tests against a [kind](https://kind.sigs.k8s.io) cluster `kube-nvim-e2e`, created with its own kubeconfig (`.e2e-kubeconfig`) so your kubeconfig and current context are left untouched. `make e2e-clean` deletes it. Without a reachable cluster the end-to-end tests are skipped.
 
 If you encounter any issues or have any questions, please open an issue on the repository.

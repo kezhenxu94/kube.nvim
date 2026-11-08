@@ -1,5 +1,5 @@
-VIM ?= vim
-NVIM ?= nvim
+VIM_BIN ?= vim
+NVIM_BIN ?= nvim
 SPECS ?= $(wildcard tests/*_spec.vim)
 # The checkout of https://github.com/kezhenxu94/resource.vim
 RESOURCE_VIM ?= ../resource.vim
@@ -20,10 +20,10 @@ define run_specs
 endef
 
 test-vim:
-	$(call run_specs,$(VIM) -Nu NONE -i NONE --not-a-term,$(SPECS),)
+	$(call run_specs,$(VIM_BIN) -Nu NONE -i NONE --not-a-term,$(SPECS),)
 
 test-nvim:
-	$(call run_specs,$(NVIM) --headless -u NONE -i NONE,$(SPECS),)
+	$(call run_specs,$(NVIM_BIN) --headless -u NONE -i NONE,$(SPECS),)
 
 # End-to-end tests against a kind cluster with its own kubeconfig, never the user's
 E2E_CLUSTER ?= kube-nvim-e2e
@@ -36,8 +36,8 @@ e2e-cluster:
 	KUBECONFIG=$(E2E_KUBECONFIG) KIND_CLUSTER=$(E2E_CLUSTER) tests/e2e/setup.sh
 
 test-e2e: e2e-cluster
-	$(call run_specs,$(VIM) -Nu NONE -i NONE --not-a-term,tests/e2e/e2e_spec.vim,$(E2E_ENV))
-	$(call run_specs,$(NVIM) --headless -u NONE -i NONE,tests/e2e/e2e_spec.vim,$(E2E_ENV))
+	$(call run_specs,$(VIM_BIN) -Nu NONE -i NONE --not-a-term,tests/e2e/e2e_spec.vim,$(E2E_ENV))
+	$(call run_specs,$(NVIM_BIN) --headless -u NONE -i NONE,tests/e2e/e2e_spec.vim,$(E2E_ENV))
 
 # The README demo: a kind cluster with its own kubeconfig, recorded with asciinema in tmux.
 # The GIF is in the repo as GitHub cannot proxy images of asciinema.org.

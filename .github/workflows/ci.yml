@@ -30,7 +30,7 @@ jobs:
         with:
           neovim: ${{ matrix.editor == 'nvim' }}
           version: ${{ matrix.version }}
-      - run: make test-${{ matrix.editor }} RESOURCE_VIM=resource.vim VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.vim.outputs.executable }}
+      - run: make test-${{ matrix.editor }} RESOURCE_VIM=resource.vim VIM_BIN=${{ steps.vim.outputs.executable }} NVIM_BIN=${{ steps.vim.outputs.executable }}
 
   e2e:
     name: e2e (kind)
@@ -55,6 +55,6 @@ jobs:
           install_only: true
           version: v0.23.0
       - uses: azure/setup-helm@v5
-      - run: make test-e2e RESOURCE_VIM=resource.vim VIM=${{ steps.vim.outputs.executable }} NVIM=${{ steps.nvim.outputs.executable }}
+      - run: make test-e2e RESOURCE_VIM=resource.vim VIM_BIN=${{ steps.vim.outputs.executable }} NVIM_BIN=${{ steps.nvim.outputs.executable }}
       - if: failure()
         run: KUBECONFIG=.e2e-kubeconfig kubectl --context kind-kube-nvim-e2e -n kube-e2e get all,events
