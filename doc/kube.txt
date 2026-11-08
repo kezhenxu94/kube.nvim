@@ -158,9 +158,8 @@ They can be changed with |g:kube_keymaps|.
     a Helm release  its values, a revision its manifest, see |kube-helm|
     anything else   the resource's YAML
 |CTRL-T| jumps back and |CTRL-W_]| opens the jump in a split, as with tags.
-In Neovim this is the 'tagfunc' of kube buffers. Vim refuses tags of URLs,
-there CTRL-], CTRL-W ] and CTRL-W CTRL-] are mapped and push the jump on the
-|tagstack|.
+Vim refuses tags of URLs: CTRL-], CTRL-W ] and CTRL-W CTRL-] are mapped and
+push the jump on the |tagstack|, in Vim and Neovim.
 
 The built-in |gx| opens a port forward URL.
 

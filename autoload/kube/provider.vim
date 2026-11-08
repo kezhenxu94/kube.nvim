@@ -32,7 +32,7 @@ function! kube#provider#get() abort
         \ }
 endfunction
 
-" Follows the conventions of Vim and Neovim: gd, K, <C-]> ('tagfunc') and the
+" Follows the conventions of Vim and Neovim: gd, K, <C-]> and the
 " built-in directory browser (<CR>, -, R). parent, refresh, watch, operations
 " and help are resource.vim's.
 let s:KEYMAPS = {
